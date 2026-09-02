@@ -165,7 +165,13 @@ function evOf(i){ return D.eventos.filter(function(e){return e.data===i;}).sort(
 /* ---------- aba hoje ---------- */
 function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
-  var evs=evOf(BASE), dl=deadlines(false), my=myList();
+  var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
+  myAll.forEach(function(t,i){ t.__extra = i >= D.minhas.length; });
+  var adiadas=[], my=[];
+  myAll.forEach(function(t){
+    var m=markOf(t.titulo);
+    if(m && m.s==='empurrado' && m.ate && m.ate>BASE) adiadas.push(t); else my.push(t);
+  });
   var feitas=0, empurradas=[], abertas=0;
   my.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else abertas++; });
   var acompAbertos=D.acomp.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
@@ -216,7 +222,7 @@ function viewHoje(){
   h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Minhas tarefas</h2></div>';
   my.forEach(function(t,idx){
     var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
-    var extra = idx >= D.minhas.length;
+    var extra = !!t.__extra;
     var box = st==='feito'?'<span class="box feito" data-toggle="'+sl+'">✓</span>'
       : st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
       : '<span class="box" data-toggle="'+sl+'"></span>';
@@ -236,12 +242,29 @@ function viewHoje(){
   });
   h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div></div>';
 
+  if(adiadas.length){
+    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Voltam depois</h2></div>'+
+      '<div class="empty" style="padding-bottom:4px">Você empurrou para uma data que ainda não chegou. Não contam como tarefa aberta e voltam sozinhas para a lista no dia.</div>';
+    adiadas.forEach(function(t){
+      var m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
+      h+='<div class="trow"><div class="tinner"><span class="box push" data-toggle="'+sl+'">→</span><div style="flex:1">'+
+        '<div class="ttitle">'+esc(t.titulo)+(t.__extra?' <span class="mine">sua</span>':'')+'</div>'+
+        '<div class="tmot">Volta em '+esc(fmtBr(m.ate))+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>'+
+        '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
+        '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
+        '<button class="ghost" data-push="'+sl+'">trazer para hoje</button>'+
+        '</div></div></div></div>';
+    });
+    h+='</div>';
+  }
+
   h+='<div class="card"><div class="shead" style="margin-bottom:12px"><span class="tick ink"></span><h2>Fechamento do dia</h2></div><div class="closing">'+
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
-    '<div><div class="cbig" style="color:#9A3A31">'+empurradas.length+'</div><div class="csml">empurradas</div></div>'+
+    '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length)+'</div><div class="csml">empurradas</div></div>'+
     '<div><div class="cbig" style="color:#16140E">'+abertas+'</div><div class="csml">abertas</div></div></div>';
-  if(empurradas.length){
-    h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+empurradas.map(function(t){
+  var todasEmpurradas=empurradas.concat(adiadas);
+  if(todasEmpurradas.length){
+    h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+todasEmpurradas.map(function(t){
       var m=markOf(t.titulo);
       return '<div class="pline">'+esc(t.titulo)+' <span style="color:#A9853F">· '+esc((m&&m.m)||'sem motivo anotado')+
         (m&&m.ate?' · para '+esc(fmtBr(m.ate)):'')+'</span></div>';
