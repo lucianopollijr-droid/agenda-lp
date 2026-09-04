@@ -134,7 +134,7 @@ function deadlines(incluirResolvidos){
     var vence = st.vence || d.vence;
     var n=Math.round((parse(vence)-BD)/86400000), over=n<0, urg=n<=1;
     out.push({
-      titulo:d.titulo, sub:d.detalhe, meta:d.processo, sort:n, resolvido:resolvido,
+      titulo:d.titulo, sub:d.detalhe, meta:d.processo, sort:n, resolvido:resolvido, fatal:!!d.fatal,
       vence:vence, movido: !!st.vence, motivo: st.m||'', original:d.vence,
       days: over?Math.abs(n):(n===0?'hoje':n),
       unit: over?(Math.abs(n)===1?'dia atrás':'dias atrás'):(n===0?'vence':(n===1?'dia':'dias')),
@@ -191,7 +191,7 @@ function viewHoje(){
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[acompAbertos,'a acompanhar','#F3F0E8'],
     [evOf(iso(amanha)).length,'amanhã','#F3F0E8'],
-    [dl.filter(function(d){return d.sort<=1;}).length,'prazo','#D98C82']];
+    [dl.filter(function(d){return d.sort<=1||d.fatal;}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
     '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
@@ -212,9 +212,23 @@ function viewHoje(){
   });
   h+='</div>';
 
-  var urg=dl.filter(function(d){return d.sort<=1;});
-  if(urg.length){
+  var urg=dl.filter(function(d){return d.sort<=1||d.fatal;});
+  var criticas=my.filter(function(t){ return t.critico && stateOf(t.titulo)!=='feito'; });
+  if(urg.length||criticas.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
+    criticas.forEach(function(t){
+      var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
+      var box = st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
+        : '<span class="box" data-toggle="'+sl+'"></span>';
+      h+='<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
+        '<div class="ttitle">'+esc(t.titulo)+'</div>'+
+        (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
+        (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
+        '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
+        '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
+        '<span class="badge" style="border-color:#9A3A31;color:#9A3A31">TRAVA UM PRAZO</span>'+
+        '</div></div></div></div>';
+    });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
     h+='</div>';
   }
