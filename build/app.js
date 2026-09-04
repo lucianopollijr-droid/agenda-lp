@@ -191,7 +191,7 @@ function viewHoje(){
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[acompAbertos,'a acompanhar','#F3F0E8'],
     [evOf(iso(amanha)).length,'amanhã','#F3F0E8'],
-    [dl.filter(function(d){return d.sort<=1||d.fatal;}).length,'prazo','#D98C82']];
+    [dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
     '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
@@ -212,7 +212,7 @@ function viewHoje(){
   });
   h+='</div>';
 
-  var urg=dl.filter(function(d){return d.sort<=1||d.fatal;});
+  var urg=dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);});
   var criticas=my.filter(function(t){ return t.critico && stateOf(t.titulo)!=='feito'; });
   if(urg.length||criticas.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
