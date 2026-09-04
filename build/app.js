@@ -49,7 +49,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -113,7 +113,7 @@ function setMark(t,st,mot,quando){
   var k=slug(t);
   if(st==='aberto') delete E.marks[k];
   else E.marks[k]={s:st,m:mot||'',ate:quando||'',d:iso(new Date())};
-  S.pushing=null; persist(); render();
+  S.pushing=null; S.anding=null; persist(); render();
 }
 function myList(){ return D.minhas.concat(E.extra); }
 
@@ -163,17 +163,68 @@ function header(){
 function evOf(i){ return D.eventos.filter(function(e){return e.data===i;}).sort(function(a,b){return String(a.hora).localeCompare(String(b.hora));}); }
 
 /* ---------- aba hoje ---------- */
+function taskRow(t, amanha, ctx){
+  var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
+  var extra=!!t.__extra;
+  var box = st==='feito'?'<span class="box feito" data-toggle="'+sl+'">✓</span>'
+    : st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
+    : st==='andamento'?'<span class="box and" data-toggle="'+sl+'">◐</span>'
+    : '<span class="box" data-toggle="'+sl+'"></span>';
+  var selo='';
+  if(st==='andamento') selo='<span class="badge" style="border-color:#2F6259;color:#2F6259">EM ANDAMENTO</span>';
+  else if(t.prio===1) selo='<span class="badge" style="border-color:#9A3A31;color:#9A3A31">PRIORIDADE</span>';
+  return '<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
+    '<div class="ttitle'+(st==='feito'?' done':'')+'">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
+    (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
+    (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
+    (st==='andamento'?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
+    '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
+    '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+selo+
+    '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
+    '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
+    (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
+    '</div>'+
+    (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
+      '<input class="field date" type="date" id="pushdate" value="'+esc(iso(amanha))+'">'+
+      '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
+    (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
+      '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
+    '</div></div></div>';
+}
+
 function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
   var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
   myAll.forEach(function(t,i){ t.__extra = i >= D.minhas.length; });
-  var adiadas=[], my=[];
+  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[];
   myAll.forEach(function(t){
     var m=markOf(t.titulo);
-    if(m && m.s==='empurrado' && m.ate && m.ate>BASE) adiadas.push(t); else my.push(t);
+    if(m && m.s==='andamento'){ andamento.push(t); return; }
+    var volta=(m && m.s==='empurrado' && m.ate)?m.ate:'';
+    var quando=t.quando||'';
+    var espera = volta>quando ? volta : quando;
+    if(espera && espera>BASE){
+      t.__espera=espera; t.__agendada=!volta;
+      if(t.tipo==='followup') fupsDepois.push(t);
+      else if(volta) adiadas.push(t);
+      else agendadas.push(t);
+      return;
+    }
+    if(t.tipo==='followup') fups.push(t); else my.push(t);
   });
+  function porPrio(a,b){ return (a.prio||2)-(b.prio||2); }
+  my=my.slice().sort(porPrio); fups=fups.slice().sort(porPrio);
+  function porEspera(a,b){ return String(a.__espera).localeCompare(String(b.__espera)); }
+  adiadas.sort(porEspera); agendadas.sort(porEspera); fupsDepois.sort(porEspera);
+  function linhaDepois(lista){
+    return '<div class="empty" style="padding-top:2px">'+lista.map(function(t){
+      return esc(t.titulo)+' · '+esc(fmtBr(t.__espera));
+    }).join('  ·  ')+'</div>';
+  }
+
   var feitas=0, empurradas=[], abertas=0;
   my.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else abertas++; });
+  var fupAbertos=fups.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
   var acompAbertos=D.acomp.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
 
   var next=evs.filter(function(e){return BASE!==today||toMin(e.hora)>=mn;})[0], nlabel='Próximo', ncount='';
@@ -189,8 +240,8 @@ function viewHoje(){
   var carro=D.carro[BASE]||{texto:'',bruna:false};
   var pct=Math.round((feitas/Math.max(my.length,1))*100);
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
-  var counts=[[abertas,'tarefas abertas','#F3F0E8'],[acompAbertos,'a acompanhar','#F3F0E8'],
-    [evOf(iso(amanha)).length,'amanhã','#F3F0E8'],
+  var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
+    [acompAbertos,'a acompanhar','#F3F0E8'],
     [dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
@@ -234,36 +285,27 @@ function viewHoje(){
   }
 
   h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Minhas tarefas</h2></div>';
-  my.forEach(function(t,idx){
-    var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
-    var extra = !!t.__extra;
-    var box = st==='feito'?'<span class="box feito" data-toggle="'+sl+'">✓</span>'
-      : st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
-      : '<span class="box" data-toggle="'+sl+'"></span>';
-    h+='<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
-      '<div class="ttitle'+(st==='feito'?' done':'')+'">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
-      (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
-      (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
-      '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
-      '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
-      '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
-      (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
-      '</div>'+
-      (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
-        '<input class="field date" type="date" id="pushdate" value="'+esc(iso(amanha))+'">'+
-        '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
-      '</div></div></div>';
-  });
+  my.forEach(function(t){ h+=taskRow(t,amanha); });
   h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div></div>';
+
+  if(andamento.length){
+    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Em andamento</h2></div>'+
+      '<div class="empty" style="padding-bottom:4px">Já começaram e não dependem de você agora. Não contam como tarefa aberta e ficam aqui até você tirar.</div>';
+    andamento.forEach(function(t){ h+=taskRow(t,amanha); });
+    h+='</div>';
+  }
 
   if(adiadas.length){
     h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Voltam depois</h2></div>'+
       '<div class="empty" style="padding-bottom:4px">Você empurrou para uma data que ainda não chegou. Não contam como tarefa aberta e voltam sozinhas para a lista no dia.</div>';
     adiadas.forEach(function(t){
       var m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
+      var motivo = t.__agendada
+        ? 'Só faz sentido em '+esc(fmtBr(t.__espera))+(t.detalhe?' · '+esc(t.detalhe):'')
+        : 'Volta em '+esc(fmtBr(t.__espera))+' · '+esc((m&&m.m)||'sem motivo anotado');
       h+='<div class="trow"><div class="tinner"><span class="box push" data-toggle="'+sl+'">→</span><div style="flex:1">'+
         '<div class="ttitle">'+esc(t.titulo)+(t.__extra?' <span class="mine">sua</span>':'')+'</div>'+
-        '<div class="tmot">Volta em '+esc(fmtBr(m.ate))+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>'+
+        '<div class="tmot">'+motivo+'</div>'+
         '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
         '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
         '<button class="ghost" data-push="'+sl+'">trazer para hoje</button>'+
@@ -272,17 +314,40 @@ function viewHoje(){
     h+='</div>';
   }
 
+  if(agendadas.length){
+    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Presas a uma data</h2></div>'+
+      '<div class="empty" style="padding-bottom:2px">Só fazem sentido no dia marcado. Voltam sozinhas para a lista lá.</div>'+
+      linhaDepois(agendadas)+'</div>';
+  }
+
+  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Follow ups</h2></div>';
+  if(!fups.length) h+='<div class="empty">Nenhum follow up para hoje.</div>';
+  else {
+    h+='<div class="empty" style="padding-bottom:4px">Só os que vencem hoje ou passaram da data.</div>';
+    fups.forEach(function(t){ h+=taskRow(t,amanha); });
+  }
+  if(fupsDepois.length){
+    h+='<div class="empty" style="padding-top:8px;padding-bottom:0">Guardados até o dia</div>'+linhaDepois(fupsDepois);
+  }
+  h+='</div>';
+
   h+='<div class="card"><div class="shead" style="margin-bottom:12px"><span class="tick ink"></span><h2>Fechamento do dia</h2></div><div class="closing">'+
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
-    '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length)+'</div><div class="csml">empurradas</div></div>'+
+    '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length+fupsDepois.filter(function(t){return !t.__agendada;}).length)+'</div><div class="csml">empurradas</div></div>'+
+    '<div><div class="cbig" style="color:#2F6259">'+andamento.length+'</div><div class="csml">em andamento</div></div>'+
     '<div><div class="cbig" style="color:#16140E">'+abertas+'</div><div class="csml">abertas</div></div></div>';
-  var todasEmpurradas=empurradas.concat(adiadas);
-  if(todasEmpurradas.length){
-    h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+todasEmpurradas.map(function(t){
-      var m=markOf(t.titulo);
-      return '<div class="pline">'+esc(t.titulo)+' <span style="color:#A9853F">· '+esc((m&&m.m)||'sem motivo anotado')+
-        (m&&m.ate?' · para '+esc(fmtBr(m.ate)):'')+'</span></div>';
-    }).join('')+'</div>';
+  var todasEmpurradas=empurradas.concat(adiadas, fupsDepois.filter(function(t){return !t.__agendada;}));
+  if(todasEmpurradas.length||andamento.length){
+    h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+
+      todasEmpurradas.map(function(t){
+        var m=markOf(t.titulo);
+        return '<div class="pline">'+esc(t.titulo)+' <span style="color:#A9853F">· '+esc((m&&m.m)||'sem motivo anotado')+
+          (m&&m.ate?' · para '+esc(fmtBr(m.ate)):'')+'</span></div>';
+      }).join('')+
+      andamento.map(function(t){
+        var m=markOf(t.titulo);
+        return '<div class="pline">'+esc(t.titulo)+' <span style="color:#2F6259">· em andamento'+((m&&m.m)?' · '+esc(m.m):'')+'</span></div>';
+      }).join('')+'</div>';
   }
   h+='</div></div>';
   return h;
@@ -421,7 +486,7 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-toggle],[data-push],[data-pushsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-delnote],#addtask,#savenote');
+  var el=ev.target.closest('[data-tab],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-delnote],#addtask,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
@@ -439,6 +504,17 @@ document.addEventListener('click', function(ev){
     t=titleFromSlug(el.dataset.pushsave); if(!t) return;
     var f=document.getElementById('pushfield'), dt=document.getElementById('pushdate');
     setMark(t,'empurrado', f?f.value.trim():'', dt?dt.value:''); return;
+  }
+  if(el.dataset.and){
+    t=titleFromSlug(el.dataset.and); if(!t) return;
+    if(stateOf(t)==='andamento') setMark(t,'aberto');
+    else { S.anding=el.dataset.and; S.pushing=null; S.pushPrazo=null; render(); }
+    return;
+  }
+  if(el.dataset.andsave){
+    t=titleFromSlug(el.dataset.andsave); if(!t) return;
+    var af=document.getElementById('andfield');
+    setMark(t,'andamento', af?af.value.trim():'', ''); return;
   }
   if(el.dataset.del){
     var alvo=el.dataset.del;
@@ -481,6 +557,9 @@ document.addEventListener('keydown', function(ev){
   else if((ev.target.id==='pushfield'||ev.target.id==='pushdate') && ev.key==='Enter'){
     var b=document.querySelector('[data-pushsave]'); if(b) b.click();
   }
+  else if(ev.target.id==='andfield' && ev.key==='Enter'){
+    var ba=document.querySelector('[data-andsave]'); if(ba) ba.click();
+  }
   else if((ev.target.id==='pzmot'||ev.target.id==='pzdate') && ev.key==='Enter'){
     var b2=document.querySelector('[data-pzsave]'); if(b2) b2.click();
   }
@@ -490,7 +569,7 @@ document.addEventListener('keydown', function(ev){
 function addTask(){
   var f=document.getElementById('newtask'); if(!f) return;
   var v=f.value.trim(); if(!v) return;
-  E.extra.push({titulo:v,detalhe:'',categoria:'geral'});
+  E.extra.push({titulo:v,detalhe:'',categoria:'geral',prio:2});
   persist(); render();
 }
 
