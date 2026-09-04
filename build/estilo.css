@@ -56,6 +56,7 @@ input,button,textarea{font-family:inherit}
 .box{display:block;width:17px;height:17px;border-radius:5px;border:1.5px solid #8B8879;flex-shrink:0;margin-top:2px;text-align:center;font-size:11px;line-height:14px;font-weight:700;cursor:pointer}
 .box.feito{background:#A9853F;border-color:#A9853F;color:#FCFCFB}
 .box.push{background:#EFE7D6;border-color:#A9853F;color:#A9853F}
+.box.and{background:#E4EEEA;border-color:#2F6259;color:#2F6259}
 .box.sm{width:15px;height:15px;line-height:12px;font-size:10px}
 .ttitle{font-size:13.5px;line-height:1.4}
 .ttitle.done{color:#8B8879;text-decoration:line-through}
