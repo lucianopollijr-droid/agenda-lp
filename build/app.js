@@ -212,6 +212,9 @@ function viewHoje(){
     }
     if(t.tipo==='followup') fups.push(t); else my.push(t);
   });
+  /* tarefa critica sobe para "Precisa de voce" e NAO se repete em "Minhas tarefas" */
+  var criticas=my.filter(function(t){ return t.critico; });
+  my=my.filter(function(t){ return !t.critico; });
   function porPrio(a,b){ return (a.prio||2)-(b.prio||2); }
   my=my.slice().sort(porPrio); fups=fups.slice().sort(porPrio);
   function porEspera(a,b){ return String(a.__espera).localeCompare(String(b.__espera)); }
@@ -223,7 +226,8 @@ function viewHoje(){
   }
 
   var feitas=0, empurradas=[], abertas=0;
-  my.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else abertas++; });
+  var contaveis=criticas.concat(my);
+  contaveis.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else abertas++; });
   var fupAbertos=fups.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
   var acompAbertos=D.acomp.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
 
@@ -238,7 +242,7 @@ function viewHoje(){
   } else if(next){ ncount=fmtDay(next.data); }
 
   var carro=D.carro[BASE]||{texto:'',bruna:false};
-  var pct=Math.round((feitas/Math.max(my.length,1))*100);
+  var pct=Math.round((feitas/Math.max(criticas.length+my.length,1))*100);
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
     [acompAbertos,'a acompanhar','#F3F0E8'],
@@ -264,7 +268,7 @@ function viewHoje(){
   h+='</div>';
 
   var urg=dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);});
-  var criticas=my.filter(function(t){ return t.critico && stateOf(t.titulo)!=='feito'; });
+  criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   if(urg.length||criticas.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
     criticas.forEach(function(t){
