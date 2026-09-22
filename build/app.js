@@ -51,7 +51,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, espando:null, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, espando:null, open:null, dResto:false, dFora:false, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -225,6 +225,54 @@ function taskRow(t, amanha, ctx){
     '</div></div></div>';
 }
 
+function taskRowC(t, amanha, ctx){
+  var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
+  var extra=!!t.__extra, open=(S.open===sl);
+  var mark = st==='feito'?'<span class="cbox feito" data-toggle="'+sl+'">✓</span>'
+    : st==='empurrado'?'<span class="cbox push" data-toggle="'+sl+'">→</span>'
+    : st==='andamento'?'<span class="cbox and" data-toggle="'+sl+'">◐</span>'
+    : '<span class="cbox" data-toggle="'+sl+'"></span>';
+  var tags='';
+  if(ctx==='critica') tags+='<span class="cbadge red">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>';
+  if(st==='andamento') tags+='<span class="cbadge green">andamento</span>';
+  else if(t.prio===1) tags+='<span class="cbadge red">alta</span>';
+  var head='<div class="crow'+(open?' open':'')+'">'+mark+
+    '<div class="cmain" data-expand="'+sl+'">'+
+      '<div class="ctitle'+(st==='feito'?' done':'')+'"><span class="cdot" style="background:'+c[1]+'"></span>'+
+      esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
+      (tags?'<div class="cbadges">'+tags+'</div>':'')+
+    '</div><span class="cchev'+(open?' open':'')+'" data-expand="'+sl+'">›</span></div>';
+  if(!open) return '<div class="ci">'+head+'</div>';
+  var det='<div class="cdetail">'+
+    (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
+    (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
+    (st==='andamento'?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
+    '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
+    '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
+    '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
+    '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
+    (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
+    '</div>'+
+    (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
+      '<input class="field date" type="date" id="pushdate" value="'+esc(iso(amanha))+'">'+
+      '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
+    (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
+      '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
+    '</div>';
+  return '<div class="ci open">'+head+det+'</div>';
+}
+
+function linhaFora(lista, tipo){
+  return lista.map(function(t){
+    var sl=slug(t.titulo), m=markOf(t.titulo);
+    var quando = t.__espera?fmtBr(t.__espera):'';
+    var extra = tipo==='adiada' ? (m&&m.m?' · '+esc(m.m):'') : '';
+    return '<div class="foraline"><span class="foradia">'+esc(quando)+'</span>'+
+      '<span class="foratit">'+esc(t.titulo)+extra+'</span>'+
+      (tipo==='adiada'?'<button class="ghost" data-push="'+sl+'">trazer p/ hoje</button>':'')+'</div>';
+  }).join('');
+}
+
 function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
   var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
@@ -309,12 +357,12 @@ function viewHoje(){
   critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   if(urg.length||criticas.length||critAnd.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
-    criticas.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
+    criticas.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
     if(critAnd.length){
       h+='<div class="subhead">Aqui, mas já em andamento</div>'+
         '<div class="empty" style="padding-bottom:4px">Você já apertou em andamento nestas. Não contam como tarefa aberta e não descem para o fim da página — ficam aqui porque você precisa lembrar delas.</div>';
-      critAnd.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
+      critAnd.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
     }
     h+='</div>';
   }
@@ -331,52 +379,50 @@ function viewHoje(){
   }
   h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo caso esperando alguém e Enter"><button class="dark" id="addesp">Add</button></div></div>';
 
-  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Minhas tarefas</h2></div>';
-  my.forEach(function(t){ h+=taskRow(t,amanha); });
-  h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div></div>';
+  /* FOCO DO DIA + resto recolhido (concluídas nunca ocupam vaga do foco) */
+  var myAbertas=my.filter(function(t){return stateOf(t.titulo)!=='feito';});
+  var focoList=myAbertas.filter(function(t){return t.foco;});
+  myAbertas.forEach(function(t){ if(!t.foco && focoList.length<6) focoList.push(t); });
+  var restoList=my.filter(function(t){return focoList.indexOf(t)<0;});
+
+  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Foco do dia</h2></div>'+
+    '<div class="empty" style="padding-bottom:4px">O que faz sentido atacar hoje. Toque numa linha para ver o detalhe e os botões.</div>';
+  if(!focoList.length) h+='<div class="empty">Sem tarefas para hoje.</div>';
+  focoList.forEach(function(t){ h+=taskRowC(t,amanha); });
+  h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div>';
+  if(restoList.length){
+    h+='<button class="drawerhead" data-drawer="resto">'+(S.dResto?'▾  Esconder as outras '+restoList.length:'▸  Ver as outras '+restoList.length+' tarefas')+'</button>';
+    if(S.dResto) restoList.forEach(function(t){ h+=taskRowC(t,amanha); });
+  }
+  h+='</div>';
 
   if(andamento.length){
     h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Em andamento</h2></div>'+
-      '<div class="empty" style="padding-bottom:4px">Já começaram e não dependem de você agora. Não contam como tarefa aberta e ficam aqui até você tirar.</div>';
-    andamento.forEach(function(t){ h+=taskRow(t,amanha); });
+      '<div class="empty" style="padding-bottom:4px">Já começaram e não dependem de você agora. Não contam como tarefa aberta.</div>';
+    andamento.forEach(function(t){ h+=taskRowC(t,amanha); });
     h+='</div>';
   }
 
-  if(adiadas.length){
-    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Voltam depois</h2></div>'+
-      '<div class="empty" style="padding-bottom:4px">Você empurrou para uma data que ainda não chegou. Não contam como tarefa aberta e voltam sozinhas para a lista no dia.</div>';
-    adiadas.forEach(function(t){
-      var m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
-      var motivo = t.__agendada
-        ? 'Só faz sentido em '+esc(fmtBr(t.__espera))+(t.detalhe?' · '+esc(t.detalhe):'')
-        : 'Volta em '+esc(fmtBr(t.__espera))+' · '+esc((m&&m.m)||'sem motivo anotado');
-      h+='<div class="trow"><div class="tinner"><span class="box push" data-toggle="'+sl+'">→</span><div style="flex:1">'+
-        '<div class="ttitle">'+esc(t.titulo)+(t.__extra?' <span class="mine">sua</span>':'')+'</div>'+
-        '<div class="tmot">'+motivo+'</div>'+
-        '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
-        '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
-        '<button class="ghost" data-push="'+sl+'">trazer para hoje</button>'+
-        '</div></div></div></div>';
-    });
+  if(fups.length){
+    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Follow ups de hoje</h2></div>'+
+      '<div class="empty" style="padding-bottom:4px">Só os que vencem hoje ou passaram da data.</div>';
+    fups.forEach(function(t){ h+=taskRowC(t,amanha); });
     h+='</div>';
   }
 
-  if(agendadas.length){
-    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Presas a uma data</h2></div>'+
-      '<div class="empty" style="padding-bottom:2px">Só fazem sentido no dia marcado. Voltam sozinhas para a lista lá.</div>'+
-      linhaDepois(agendadas)+'</div>';
+  /* GAVETA: fora do radar de hoje */
+  var totalFora=adiadas.length+agendadas.length+fupsDepois.length;
+  if(totalFora){
+    h+='<div class="block"><button class="drawerhead big" data-drawer="fora">'+
+      (S.dFora?'▾  Fora do radar de hoje ('+totalFora+')':'▸  Fora do radar de hoje ('+totalFora+')')+'</button>';
+    if(S.dFora){
+      h+='<div class="empty" style="padding-bottom:4px">Empurradas, presas a uma data e follow ups guardados. Voltam sozinhas no dia.</div>';
+      if(adiadas.length){ h+='<div class="subhead">Voltam depois</div>'+linhaFora(adiadas,'adiada'); }
+      if(agendadas.length){ h+='<div class="subhead">Presas a uma data</div>'+linhaFora(agendadas,'agendada'); }
+      if(fupsDepois.length){ h+='<div class="subhead">Follow ups guardados</div>'+linhaFora(fupsDepois,'fup'); }
+    }
+    h+='</div>';
   }
-
-  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Follow ups</h2></div>';
-  if(!fups.length) h+='<div class="empty">Nenhum follow up para hoje.</div>';
-  else {
-    h+='<div class="empty" style="padding-bottom:4px">Só os que vencem hoje ou passaram da data.</div>';
-    fups.forEach(function(t){ h+=taskRow(t,amanha); });
-  }
-  if(fupsDepois.length){
-    h+='<div class="empty" style="padding-top:8px;padding-bottom:0">Guardados até o dia</div>'+linhaDepois(fupsDepois);
-  }
-  h+='</div>';
 
   h+='<div class="card"><div class="shead" style="margin-bottom:12px"><span class="tick ink"></span><h2>Fechamento do dia</h2></div><div class="closing">'+
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
@@ -533,10 +579,12 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
+  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
+  if(el.dataset.expand){ S.open = (S.open===el.dataset.expand)?null:el.dataset.expand; S.pushing=null; S.anding=null; render(); return; }
+  if(el.dataset.drawer){ if(el.dataset.drawer==='resto') S.dResto=!S.dResto; else S.dFora=!S.dFora; render(); return; }
   if(el.dataset.toggle){
     t=titleFromSlug(el.dataset.toggle); if(!t) return;
     setMark(t, stateOf(t)==='feito'?'aberto':'feito'); return;
