@@ -51,7 +51,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, tratPrazo:null, anding:null, espando:null, open:null, dResto:false, dFora:false, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, tratPrazo:null, anding:null, espando:null, esperandoT:null, open:null, dResto:false, dFora:false, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -149,6 +149,24 @@ function espRow(x){
     '</div></div></div>';
 }
 
+function espTaskRow(t){
+  var sl=slug(t.titulo), m=markOf(t.titulo)||{}, c=cat(t.categoria), extra=!!t.__extra;
+  return '<div class="trow"><div class="tinner">'+
+    '<span class="box wait" data-toggle="'+sl+'">⋯</span><div style="flex:1">'+
+    '<div class="ttitle">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
+    (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
+    '<div class="tmot">Esperando · '+esc(m.m||'na mão de outra pessoa')+'</div>'+
+    '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
+    '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
+    (t.critico?'<span class="badge" style="border-color:#9A3A31;color:#9A3A31">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>':'')+
+    '<button class="ghost" data-esp="'+sl+'">mudar anotação</button>'+
+    '<button class="ghost" data-espoff="'+sl+'">voltar para tarefas</button>'+
+    '</div>'+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?" value="'+esc(m.m||'')+'">'+
+      '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
+    '</div></div></div>';
+}
+
 /* ---------- prazos ---------- */
 function pzOf(t){ return E.prazos[slug(t)]||null; }
 function setPrazo(t,obj){
@@ -173,7 +191,7 @@ function deadlines(incluirResolvidos){
       vence:vence, movido: !!st.vence, motivo: st.m||'', original:d.vence,
       days: over?Math.abs(n):(n===0?'hoje':n),
       unit: over?(Math.abs(n)===1?'dia atrás':'dias atrás'):(n===0?'vence':(n===1?'dia':'dias')),
-      badge: tratando?'EM TRATAMENTO':(over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':(aud?'AUDIÊNCIA EM '+n+' DIAS':'EM '+n+' DIAS')))),
+      badge: tratando?('EM TRATAMENTO · '+(over?'VENCEU ':'VENCE ')+fmtBr(vence)):(over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':(aud?'AUDIÊNCIA EM '+n+' DIAS':'EM '+n+' DIAS')))),
       color: tratando?'#2F6259':((urg||over)?'#9A3A31':'#A9853F'),
       tcolor: tratando?'#16140E':((urg||over)?'#9A3A31':'#16140E')
     });
@@ -218,6 +236,7 @@ function taskRow(t, amanha, ctx){
     '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+selo+
     '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
     '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
+    '<button class="ghost" data-esp="'+sl+'">esperando alguém</button>'+
     (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
     '</div>'+
     (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
@@ -225,6 +244,8 @@ function taskRow(t, amanha, ctx){
       '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
     (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
       '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?">'+
+      '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
     '</div></div></div>';
 }
 
@@ -254,6 +275,7 @@ function taskRowC(t, amanha, ctx){
     '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
     '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
     '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
+    '<button class="ghost" data-esp="'+sl+'">esperando alguém</button>'+
     (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
     '</div>'+
     (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
@@ -261,6 +283,8 @@ function taskRowC(t, amanha, ctx){
       '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
     (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
       '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?">'+
+      '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
     '</div>';
   return '<div class="ci open">'+head+det+'</div>';
 }
@@ -280,9 +304,11 @@ function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
   var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
   myAll.forEach(function(t,i){ t.__extra = i >= D.minhas.length; });
-  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[];
+  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[], esperandoT=[];
   myAll.forEach(function(t){
     var m=markOf(t.titulo);
+    /* esperando alguem: sai de tudo e vai para o bloco proprio, mesmo sendo critica */
+    if(m && m.s==='esperando'){ esperandoT.push(t); return; }
     /* critica fica sempre em "Precisa de voce", mesmo em andamento ou empurrada */
     if(t.critico){ my.push(t); return; }
     if(m && m.s==='andamento'){ andamento.push(t); return; }
@@ -362,23 +388,28 @@ function viewHoje(){
   var urg=dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));});
   criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
-  if(urg.length||criticas.length||critAnd.length||pzTrat.length){
+  if(urg.length||criticas.length||critAnd.length){
     h+='<div class="block needyou"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
     criticas.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
-    if(critAnd.length||pzTrat.length){
-      h+='<div class="subhead">Em tratamento · de olho</div>'+
-        '<div class="empty" style="padding-bottom:4px">Já estão andando e não gritam mais como atraso — mas seguem aqui porque dependem de você acompanhar ou cobrar.</div>';
+    if(critAnd.length){
+      h+='<div class="subhead">Aqui, mas já em andamento</div>'+
+        '<div class="empty" style="padding-bottom:4px">Já começaram e não dependem de você agora — mas travam um prazo, então seguem à vista.</div>';
       critAnd.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
-      pzTrat.forEach(function(d){ h+=prazoRow(d,true); });
     }
     h+='</div>';
   }
 
-  var esp=espList(), espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito;});
+  var esp=espList(), jaMostrado={};
+  pzTrat.forEach(function(d){ jaMostrado[slug(d.titulo)]=1; });
+  esperandoT.forEach(function(t){ jaMostrado[slug(t.titulo)]=1; });
+  var espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito && !jaMostrado[slug(x.titulo)];});
+  var totalEsp=pzTrat.length+esperandoT.length+espAbertos.length;
   h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Esperando alguém</h2></div>'+
-    '<div class="empty" style="padding-bottom:4px">Casos em que a sua parte já saiu e agora você está em cima de outra pessoa. Não são tarefas nem prazos — é o histórico para você não esquecer de cobrar.</div>';
-  if(!espAbertos.length) h+='<div class="empty">Nada esperando resposta.</div>';
+    '<div class="empty" style="padding-bottom:4px">Tudo que está parado na mão de outra pessoa: a sua parte já saiu e agora é cobrar. Prazo que você marcou como em tratamento vem para cá inteiro, com a data — não fica repetido em Precisa de você.</div>';
+  if(!totalEsp) h+='<div class="empty">Nada esperando resposta.</div>';
+  pzTrat.forEach(function(d){ h+=prazoRow(d,true); });
+  esperandoT.forEach(function(t){ h+=espTaskRow(t); });
   espAbertos.forEach(function(x){ h+=espRow(x); });
   var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
   if(espFeitos.length){
@@ -436,9 +467,10 @@ function viewHoje(){
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
     '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length+fupsDepois.filter(function(t){return !t.__agendada;}).length)+'</div><div class="csml">empurradas</div></div>'+
     '<div><div class="cbig" style="color:#2F6259">'+andamento.length+'</div><div class="csml">em andamento</div></div>'+
+    '<div><div class="cbig" style="color:#42506A">'+(esperandoT.length+pzTrat.length)+'</div><div class="csml">esperando</div></div>'+
     '<div><div class="cbig" style="color:#16140E">'+abertas+'</div><div class="csml">abertas</div></div></div>';
   var todasEmpurradas=empurradas.concat(adiadas, fupsDepois.filter(function(t){return !t.__agendada;}));
-  if(todasEmpurradas.length||andamento.length){
+  if(todasEmpurradas.length||andamento.length||esperandoT.length){
     h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+
       todasEmpurradas.map(function(t){
         var m=markOf(t.titulo);
@@ -448,6 +480,10 @@ function viewHoje(){
       andamento.map(function(t){
         var m=markOf(t.titulo);
         return '<div class="pline">'+esc(t.titulo)+' <span style="color:#2F6259">· em andamento'+((m&&m.m)?' · '+esc(m.m):'')+'</span></div>';
+      }).join('')+
+      esperandoT.map(function(t){
+        var m=markOf(t.titulo);
+        return '<div class="pline">'+esc(t.titulo)+' <span style="color:#42506A">· esperando'+((m&&m.m)?' · '+esc(m.m):'')+'</span></div>';
       }).join('')+'</div>';
   }
   h+='</div></div>';
@@ -595,7 +631,7 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pztrat],[data-pztratsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
+  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pztrat],[data-pztratsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-esp],[data-esptsave],[data-espoff],[data-delnote],#addtask,#addesp,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
@@ -626,6 +662,20 @@ document.addEventListener('click', function(ev){
     t=titleFromSlug(el.dataset.andsave); if(!t) return;
     var af=document.getElementById('andfield');
     setMark(t,'andamento', af?af.value.trim():'', ''); return;
+  }
+  if(el.dataset.esp){
+    t=titleFromSlug(el.dataset.esp); if(!t) return;
+    S.esperandoT=el.dataset.esp; S.pushing=null; S.anding=null; S.pushPrazo=null; render(); return;
+  }
+  if(el.dataset.esptsave){
+    t=titleFromSlug(el.dataset.esptsave); if(!t) return;
+    var ef=document.getElementById('espTfield');
+    S.esperandoT=null;
+    setMark(t,'esperando', ef?ef.value.trim():'', ''); return;
+  }
+  if(el.dataset.espoff){
+    t=titleFromSlug(el.dataset.espoff); if(!t) return;
+    setMark(t,'aberto'); return;
   }
   if(el.dataset.del){
     var alvo=el.dataset.del;
