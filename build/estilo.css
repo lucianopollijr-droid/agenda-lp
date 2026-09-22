@@ -114,3 +114,31 @@ button:focus-visible,.box:focus-visible,input:focus-visible,textarea:focus-visib
 @media (max-width:640px){.field.date{flex:1 1 100%}}
 
 .subhead{margin:16px 0 2px;padding-top:12px;border-top:1px dashed #D8D3C4;font:600 11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#2F6259}
+
+/* ---- linha enxuta (v4) ---- */
+.ci{border-bottom:1px solid #ECE7DA}
+.ci.open{background:#FBFAF6}
+.crow{display:flex;align-items:center;gap:11px;padding:11px 2px;cursor:pointer}
+.cbox{flex:none;width:21px;height:21px;border:1.6px solid #C9C3B2;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;cursor:pointer}
+.cbox.feito{background:#A9853F;border-color:#A9853F}
+.cbox.push{background:#8B8879;border-color:#8B8879}
+.cbox.and{background:#2F6259;border-color:#2F6259}
+.cmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ctitle{font-size:14.5px;line-height:1.25;color:#16140E;display:flex;align-items:baseline;gap:7px}
+.ctitle.done{text-decoration:line-through;color:#B0AC9C}
+.cdot{flex:none;width:7px;height:7px;border-radius:50%;transform:translateY(-1px)}
+.cbadges{display:flex;flex-wrap:wrap;gap:6px}
+.cbadge{font:600 9.5px/1 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:20px;border:1px solid}
+.cbadge.red{color:#9A3A31;border-color:#9A3A31}
+.cbadge.green{color:#2F6259;border-color:#2F6259}
+.cchev{flex:none;color:#C4BEAD;font-size:20px;line-height:1;transition:transform .15s;padding:0 4px;cursor:pointer}
+.cchev.open{transform:rotate(90deg);color:#A9853F}
+.cdetail{padding:2px 2px 14px 34px}
+.cdetail .tsub{font-size:12.5px;line-height:1.5;color:#6B6858;margin-bottom:8px}
+
+/* ---- gavetas ---- */
+.drawerhead{width:100%;text-align:left;background:none;border:none;border-top:1px solid #ECE7DA;padding:13px 2px;font:600 12.5px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#8B7A4F;cursor:pointer;letter-spacing:.01em}
+.drawerhead.big{font-size:13.5px;color:#16140E;border-top:none}
+.foraline{display:flex;align-items:baseline;gap:9px;padding:8px 2px;border-bottom:1px solid #F1ECE0}
+.foradia{flex:none;font:600 11px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#A9853F;min-width:52px}
+.foratit{flex:1;font-size:12.5px;line-height:1.4;color:#4A4636}
