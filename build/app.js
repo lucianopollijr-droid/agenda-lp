@@ -41,6 +41,7 @@ E.prazos = E.prazos || {};
 E.extra  = E.extra  || [];
 E.esp    = E.esp    || {};   /* {slug:{m:'nota',feito:bool,d:''}} */
 E.espExtra = E.espExtra || [];
+E.foco = E.foco || {};
 E.notes  = E.notes  || [];
 E.ts     = E.ts     || 0;
 
@@ -110,6 +111,7 @@ if(window.claude && typeof window.claude.use === 'function'){
 
 /* ---------- estado das tarefas ---------- */
 function markOf(t){ return E.marks[slug(t)]||null; }
+function parado(m){ return !!(m && (m.s==='andamento' || m.s==='esperando')); }
 function stateOf(t){ var m=markOf(t); return m?m.s:'aberto'; }
 function setMark(t,st,mot,quando){
   var k=slug(t);
@@ -149,20 +151,21 @@ function espRow(x){
     '</div></div></div>';
 }
 
-function espTaskRow(t){
+function paradaRow(t){
   var sl=slug(t.titulo), m=markOf(t.titulo)||{}, c=cat(t.categoria), extra=!!t.__extra;
   return '<div class="trow"><div class="tinner">'+
     '<span class="box wait" data-toggle="'+sl+'">⋯</span><div style="flex:1">'+
     '<div class="ttitle">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
     (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
-    '<div class="tmot">Esperando · '+esc(m.m||'na mão de outra pessoa')+'</div>'+
+    '<div class="tmot">'+esc(m.m||'não depende de você agora')+'</div>'+
     '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
     '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
     (t.critico?'<span class="badge" style="border-color:#9A3A31;color:#9A3A31">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>':'')+
     '<button class="ghost" data-esp="'+sl+'">mudar anotação</button>'+
-    '<button class="ghost" data-espoff="'+sl+'">voltar para tarefas</button>'+
+    '<button class="ghost" data-espoff="'+sl+'">trazer para as tarefas</button>'+
+    '<button class="ghost" data-toggle="'+sl+'">concluir</button>'+
     '</div>'+
-    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?" value="'+esc(m.m||'')+'">'+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="Em que pé está? Depende de quem?" value="'+esc(m.m||'')+'">'+
       '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
     '</div></div></div>';
 }
@@ -187,6 +190,7 @@ function deadlines(incluirResolvidos){
     var n=Math.round((parse(vence)-BD)/86400000), over=n<0, urg=n<=1;
     out.push({
       titulo:d.titulo, sub:d.detalhe, meta:d.processo, sort:n, resolvido:resolvido, fatal:!!d.fatal,
+      conteudo: d.tipo==='conteudo',
       aud:aud, tratando:tratando, tratmot: st.ag||'',
       vence:vence, movido: !!st.vence, motivo: st.m||'', original:d.vence,
       days: over?Math.abs(n):(n===0?'hoje':n),
@@ -221,30 +225,30 @@ function taskRow(t, amanha, ctx){
   var extra=!!t.__extra;
   var box = st==='feito'?'<span class="box feito" data-toggle="'+sl+'">✓</span>'
     : st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
-    : st==='andamento'?'<span class="box and" data-toggle="'+sl+'">◐</span>'
+    : parado(m)?'<span class="box and" data-toggle="'+sl+'">◐</span>'
     : '<span class="box" data-toggle="'+sl+'"></span>';
   var selo='';
-  if(st==='andamento') selo='<span class="badge" style="border-color:#2F6259;color:#2F6259">EM ANDAMENTO</span>';
+  if(parado(m)) selo='<span class="badge" style="border-color:#2F6259;color:#2F6259">EM ANDAMENTO</span>';
   else if(t.prio===1) selo='<span class="badge" style="border-color:#9A3A31;color:#9A3A31">PRIORIDADE</span>';
   if(ctx==='critica') selo+='<span class="badge" style="border-color:#9A3A31;color:#9A3A31">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>';
   return '<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
     '<div class="ttitle'+(st==='feito'?' done':'')+'">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
     (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
     (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
-    (st==='andamento'?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
+    (parado(m)?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
     '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
     '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+selo+
     '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
-    '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
-    '<button class="ghost" data-esp="'+sl+'">esperando alguém</button>'+
+    (parado(m)?'<button class="ghost" data-esp="'+sl+'">mudar anotação</button>'+
+       '<button class="ghost" data-espoff="'+sl+'">trazer para as tarefas</button>'
+      :'<button class="ghost" data-esp="'+sl+'">não depende de mim agora</button>'+
+       '<button class="ghost" data-foco="'+sl+'">'+(E.foco[sl]===true?'tirar do foco':'pôr no foco')+'</button>')+
     (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
     '</div>'+
     (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
       '<input class="field date" type="date" id="pushdate" value="'+esc(iso(amanha))+'">'+
       '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
-    (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
-      '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
-    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?">'+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="Em que pé está? Depende de quem?">'+
       '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
     '</div></div></div>';
 }
@@ -254,11 +258,11 @@ function taskRowC(t, amanha, ctx){
   var extra=!!t.__extra, open=(S.open===sl);
   var mark = st==='feito'?'<span class="cbox feito" data-toggle="'+sl+'">✓</span>'
     : st==='empurrado'?'<span class="cbox push" data-toggle="'+sl+'">→</span>'
-    : st==='andamento'?'<span class="cbox and" data-toggle="'+sl+'">◐</span>'
+    : parado(m)?'<span class="cbox and" data-toggle="'+sl+'">◐</span>'
     : '<span class="cbox" data-toggle="'+sl+'"></span>';
   var tags='';
   if(ctx==='critica') tags+='<span class="cbadge red">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>';
-  if(st==='andamento') tags+='<span class="cbadge green">andamento</span>';
+  if(parado(m)) tags+='<span class="cbadge green">andamento</span>';
   else if(t.prio===1) tags+='<span class="cbadge red">alta</span>';
   var head='<div class="crow'+(open?' open':'')+'">'+mark+
     '<div class="cmain" data-expand="'+sl+'">'+
@@ -270,20 +274,20 @@ function taskRowC(t, amanha, ctx){
   var det='<div class="cdetail">'+
     (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
     (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
-    (st==='andamento'?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
+    (parado(m)?'<div class="tmot">Em andamento'+((m&&m.m)?' · '+esc(m.m):' · não depende de você agora')+'</div>':'')+
     '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
     '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
     '<button class="ghost" data-push="'+sl+'">'+(st==='empurrado'?'reabrir':'empurrar')+'</button>'+
-    '<button class="ghost" data-and="'+sl+'">'+(st==='andamento'?'tirar de andamento':'em andamento')+'</button>'+
-    '<button class="ghost" data-esp="'+sl+'">esperando alguém</button>'+
+    (parado(m)?'<button class="ghost" data-esp="'+sl+'">mudar anotação</button>'+
+       '<button class="ghost" data-espoff="'+sl+'">trazer para as tarefas</button>'
+      :'<button class="ghost" data-esp="'+sl+'">não depende de mim agora</button>'+
+       '<button class="ghost" data-foco="'+sl+'">'+(E.foco[sl]===true?'tirar do foco':'pôr no foco')+'</button>')+
     (extra?'<button class="ghost" data-del="'+esc(t.titulo)+'">apagar</button>':'')+
     '</div>'+
     (S.pushing===sl?'<div class="inline"><input class="field" id="pushfield" placeholder="Por que ficou para depois?">'+
       '<input class="field date" type="date" id="pushdate" value="'+esc(iso(amanha))+'">'+
       '<button class="gold" data-pushsave="'+sl+'">Ok</button></div>':'')+
-    (S.anding===sl?'<div class="inline"><input class="field" id="andfield" placeholder="Em que pé está? (opcional)">'+
-      '<button class="gold" data-andsave="'+sl+'">Ok</button></div>':'')+
-    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="De quem você está esperando? Em que pé está?">'+
+    (S.esperandoT===sl?'<div class="inline"><input class="field" id="espTfield" placeholder="Em que pé está? Depende de quem?">'+
       '<button class="gold" data-esptsave="'+sl+'">Ok</button></div>':'')+
     '</div>';
   return '<div class="ci open">'+head+det+'</div>';
@@ -304,14 +308,13 @@ function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
   var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
   myAll.forEach(function(t,i){ t.__extra = i >= D.minhas.length; });
-  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[], esperandoT=[];
+  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[];
   myAll.forEach(function(t){
     var m=markOf(t.titulo);
-    /* esperando alguem: sai de tudo e vai para o bloco proprio, mesmo sendo critica */
-    if(m && m.s==='esperando'){ esperandoT.push(t); return; }
-    /* critica fica sempre em "Precisa de voce", mesmo em andamento ou empurrada */
+    /* critica fica sempre em "Precisa de voce", mesmo parada ou empurrada */
     if(t.critico){ my.push(t); return; }
-    if(m && m.s==='andamento'){ andamento.push(t); return; }
+    /* parado = em andamento / nao depende de voce agora: bloco unico */
+    if(parado(m)){ andamento.push(t); return; }
     var volta=(m && m.s==='empurrado' && m.ate)?m.ate:'';
     var quando=t.quando||'';
     var espera = volta>quando ? volta : quando;
@@ -327,8 +330,8 @@ function viewHoje(){
   /* tarefa critica sobe para "Precisa de voce" e NAO se repete em "Minhas tarefas" */
   var criticas=my.filter(function(t){ return t.critico; });
   my=my.filter(function(t){ return !t.critico; });
-  var critAnd=criticas.filter(function(t){ return stateOf(t.titulo)==='andamento'; });
-  criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='andamento'; });
+  var critAnd=criticas.filter(function(t){ return parado(markOf(t.titulo)); });
+  criticas=criticas.filter(function(t){ return !parado(markOf(t.titulo)); });
   function porPrio(a,b){ return (a.prio||2)-(b.prio||2); }
   my=my.slice().sort(porPrio); fups=fups.slice().sort(porPrio);
   function porEspera(a,b){ return String(a.__espera).localeCompare(String(b.__espera)); }
@@ -341,7 +344,7 @@ function viewHoje(){
 
   var feitas=0, empurradas=[], abertas=0;
   var contaveis=criticas.concat(critAnd).concat(my);
-  contaveis.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else if(st!=='andamento')abertas++; });
+  contaveis.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else if(!parado(markOf(t.titulo)))abertas++; });
   var fupAbertos=fups.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
   var acompAbertos=D.acomp.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
 
@@ -360,10 +363,10 @@ function viewHoje(){
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
     [acompAbertos,'a acompanhar','#F3F0E8'],
-    [dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));}).length,'prazo','#D98C82']];
+    [dl.filter(function(d){return !d.tratando && !d.conteudo && (d.sort<=7 || (d.aud && d.sort<=30));}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero">'+
-    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando;})?'ATENÇÃO':D.tag)+'</div>'+
+    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando && !d.conteudo;})?'ATENÇÃO':D.tag)+'</div>'+
     '<div class="counts">'+
     counts.map(function(c){return '<div><div class="cnum" style="color:'+c[2]+'">'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
     '</div>'+
@@ -385,7 +388,8 @@ function viewHoje(){
   h+='</div>';
 
   var pzTrat=dl.filter(function(d){return d.tratando;});
-  var urg=dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));});
+  var urg=dl.filter(function(d){return !d.tratando && !d.conteudo && (d.sort<=7 || (d.aud && d.sort<=30));});
+  var conteudoDl=dl.filter(function(d){return !d.tratando && d.conteudo && d.sort<=7;});
   criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   if(urg.length||criticas.length||critAnd.length){
@@ -400,32 +404,23 @@ function viewHoje(){
     h+='</div>';
   }
 
-  var esp=espList(), jaMostrado={};
-  pzTrat.forEach(function(d){ jaMostrado[slug(d.titulo)]=1; });
-  esperandoT.forEach(function(t){ jaMostrado[slug(t.titulo)]=1; });
-  var espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito && !jaMostrado[slug(x.titulo)];});
-  var totalEsp=pzTrat.length+esperandoT.length+espAbertos.length;
-  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Esperando alguém</h2></div>'+
-    '<div class="empty" style="padding-bottom:4px">Tudo que está parado na mão de outra pessoa: a sua parte já saiu e agora é cobrar. Prazo que você marcou como em tratamento vem para cá inteiro, com a data — não fica repetido em Precisa de você.</div>';
-  if(!totalEsp) h+='<div class="empty">Nada esperando resposta.</div>';
-  pzTrat.forEach(function(d){ h+=prazoRow(d,true); });
-  esperandoT.forEach(function(t){ h+=espTaskRow(t); });
-  espAbertos.forEach(function(x){ h+=espRow(x); });
-  var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
-  if(espFeitos.length){
-    h+='<div class="empty" style="padding-top:10px;padding-bottom:2px">Voltaram</div>';
-    espFeitos.forEach(function(x){ h+=espRow(x); });
-  }
-  h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo caso esperando alguém e Enter"><button class="dark" id="addesp">Add</button></div></div>';
-
   /* FOCO DO DIA + resto recolhido (concluídas nunca ocupam vaga do foco) */
   var myAbertas=my.filter(function(t){return stateOf(t.titulo)!=='feito';});
-  var focoList=myAbertas.filter(function(t){return t.foco;});
-  myAbertas.forEach(function(t){ if(!t.foco && focoList.length<6) focoList.push(t); });
+  var focoList=myAbertas.filter(function(t){return E.foco[slug(t.titulo)]===true;});
+  var manual=focoList.length>0;
+  myAbertas.forEach(function(t){
+    var f=E.foco[slug(t.titulo)];
+    if(f===true || f===false) return;
+    if(!manual && t.foco && focoList.indexOf(t)<0) focoList.push(t);
+  });
+  myAbertas.forEach(function(t){
+    if(E.foco[slug(t.titulo)]===false) return;
+    if(focoList.indexOf(t)<0 && focoList.length<6) focoList.push(t);
+  });
   var restoList=my.filter(function(t){return focoList.indexOf(t)<0;});
 
   h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Foco do dia</h2></div>'+
-    '<div class="empty" style="padding-bottom:4px">O que faz sentido atacar hoje. Toque numa linha para ver o detalhe e os botões.</div>';
+    '<div class="empty" style="padding-bottom:4px">O que faz sentido atacar hoje. Toque numa linha para abrir e use "pôr no foco" / "tirar do foco" para montar a lista do seu jeito'+(manual?' — hoje ela é sua, não minha.':'; sem marcação sua, eu preencho pela prioridade.')+'</div>';
   if(!focoList.length) h+='<div class="empty">Sem tarefas para hoje.</div>';
   focoList.forEach(function(t){ h+=taskRowC(t,amanha); });
   h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div>';
@@ -435,17 +430,35 @@ function viewHoje(){
   }
   h+='</div>';
 
-  if(andamento.length){
-    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Em andamento</h2></div>'+
-      '<div class="empty" style="padding-bottom:4px">Já começaram e não dependem de você agora. Não contam como tarefa aberta.</div>';
-    andamento.forEach(function(t){ h+=taskRowC(t,amanha); });
-    h+='</div>';
-  }
-
   if(fups.length){
     h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Follow ups de hoje</h2></div>'+
       '<div class="empty" style="padding-bottom:4px">Só os que vencem hoje ou passaram da data.</div>';
     fups.forEach(function(t){ h+=taskRowC(t,amanha); });
+    h+='</div>';
+  }
+
+  var esp=espList(), jaMostrado={};
+  pzTrat.forEach(function(d){ jaMostrado[slug(d.titulo)]=1; });
+  andamento.forEach(function(t){ jaMostrado[slug(t.titulo)]=1; });
+  var espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito && !jaMostrado[slug(x.titulo)];});
+  var totalPar=pzTrat.length+andamento.length+espAbertos.length;
+  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Em andamento · não pede nada de você agora</h2></div>'+
+    '<div class="empty" style="padding-bottom:4px">Assuntos que estão correndo e hoje não têm passo seu: ou já saíram da sua mão, ou dependem de outra pessoa. Não contam como tarefa aberta. Quando voltar a ter algo a fazer, toque em "trazer para as tarefas".</div>';
+  if(!totalPar) h+='<div class="empty">Nada parado no momento.</div>';
+  pzTrat.forEach(function(d){ h+=prazoRow(d,true); });
+  andamento.forEach(function(t){ h+=paradaRow(t); });
+  espAbertos.forEach(function(x){ h+=espRow(x); });
+  var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
+  if(espFeitos.length){
+    h+='<div class="empty" style="padding-top:10px;padding-bottom:2px">Voltaram</div>';
+    espFeitos.forEach(function(x){ h+=espRow(x); });
+  }
+  h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo assunto em andamento e Enter"><button class="dark" id="addesp">Add</button></div></div>';
+
+  if(conteudoDl.length){
+    h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Conteúdo da semana</h2></div>'+
+      '<div class="empty" style="padding-bottom:4px">Gravar, postar, foto, carrossel. Ficam fora de "Precisa de você" e fora da contagem de prazos — é rotina de marketing, não peça com prazo.</div>';
+    conteudoDl.forEach(function(d){ h+=prazoRow(d,true); });
     h+='</div>';
   }
 
@@ -467,10 +480,10 @@ function viewHoje(){
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
     '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length+fupsDepois.filter(function(t){return !t.__agendada;}).length)+'</div><div class="csml">empurradas</div></div>'+
     '<div><div class="cbig" style="color:#2F6259">'+andamento.length+'</div><div class="csml">em andamento</div></div>'+
-    '<div><div class="cbig" style="color:#42506A">'+(esperandoT.length+pzTrat.length)+'</div><div class="csml">esperando</div></div>'+
+    '<div><div class="cbig" style="color:#42506A">'+pzTrat.length+'</div><div class="csml">esperando</div></div>'+
     '<div><div class="cbig" style="color:#16140E">'+abertas+'</div><div class="csml">abertas</div></div></div>';
   var todasEmpurradas=empurradas.concat(adiadas, fupsDepois.filter(function(t){return !t.__agendada;}));
-  if(todasEmpurradas.length||andamento.length||esperandoT.length){
+  if(todasEmpurradas.length||andamento.length){
     h+='<div class="pushed"><h3>Eu leio isto amanhã de manhã</h3>'+
       todasEmpurradas.map(function(t){
         var m=markOf(t.titulo);
@@ -481,10 +494,7 @@ function viewHoje(){
         var m=markOf(t.titulo);
         return '<div class="pline">'+esc(t.titulo)+' <span style="color:#2F6259">· em andamento'+((m&&m.m)?' · '+esc(m.m):'')+'</span></div>';
       }).join('')+
-      esperandoT.map(function(t){
-        var m=markOf(t.titulo);
-        return '<div class="pline">'+esc(t.titulo)+' <span style="color:#42506A">· esperando'+((m&&m.m)?' · '+esc(m.m):'')+'</span></div>';
-      }).join('')+'</div>';
+      ''+'</div>';
   }
   h+='</div></div>';
   return h;
@@ -631,7 +641,7 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pztrat],[data-pztratsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-esp],[data-esptsave],[data-espoff],[data-delnote],#addtask,#addesp,#savenote');
+  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pztrat],[data-pztratsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-esp],[data-esptsave],[data-espoff],[data-foco],[data-delnote],#addtask,#addesp,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
@@ -671,7 +681,12 @@ document.addEventListener('click', function(ev){
     t=titleFromSlug(el.dataset.esptsave); if(!t) return;
     var ef=document.getElementById('espTfield');
     S.esperandoT=null;
-    setMark(t,'esperando', ef?ef.value.trim():'', ''); return;
+    setMark(t,'andamento', ef?ef.value.trim():'', ''); return;
+  }
+  if(el.dataset.foco){
+    var fk=el.dataset.foco;
+    if(E.foco[fk]===true) E.foco[fk]=false; else E.foco[fk]=true;
+    persist(); render(); return;
   }
   if(el.dataset.espoff){
     t=titleFromSlug(el.dataset.espoff); if(!t) return;
@@ -754,8 +769,8 @@ document.addEventListener('keydown', function(ev){
   else if((ev.target.id==='pushfield'||ev.target.id==='pushdate') && ev.key==='Enter'){
     var b=document.querySelector('[data-pushsave]'); if(b) b.click();
   }
-  else if(ev.target.id==='andfield' && ev.key==='Enter'){
-    var ba=document.querySelector('[data-andsave]'); if(ba) ba.click();
+  else if(ev.target.id==='espTfield' && ev.key==='Enter'){
+    var ba=document.querySelector('[data-esptsave]'); if(ba) ba.click();
   }
   else if((ev.target.id==='pzmot'||ev.target.id==='pzdate') && ev.key==='Enter'){
     var b2=document.querySelector('[data-pzsave]'); if(b2) b2.click();
