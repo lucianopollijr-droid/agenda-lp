@@ -101,6 +101,7 @@ input,button,textarea{font-family:inherit}
 .cbox.feito{background:var(--gold);border-color:var(--gold)}
 .cbox.push{background:var(--faint);border-color:var(--faint)}
 .cbox.and{background:var(--care);border-color:var(--care)}
+.cbox.wait{background:var(--wait);border-color:var(--wait)}
 .cmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .ctitle{font-family:var(--serif);font-size:16.5px;font-weight:500;line-height:1.3;letter-spacing:-.005em;
  color:var(--ink);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
@@ -192,6 +193,7 @@ input,button,textarea{font-family:inherit}
 .box.feito{background:var(--gold);border-color:var(--gold)}
 .box.push{background:var(--faint);border-color:var(--faint)}
 .box.and{background:var(--care);border-color:var(--care)}
+.box.wait{background:var(--wait);border-color:var(--wait);color:#fff;font-size:11px;line-height:1}
 .box.sm{width:15px;height:15px;font-size:9px}
 .ttitle{font-family:var(--serif);font-size:16px;font-weight:500;line-height:1.3}
 .ttitle.done{color:var(--faint);text-decoration:line-through}
