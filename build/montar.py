@@ -16,11 +16,11 @@ appjs = open('app.js', encoding='utf-8').read()
 
 FONTES = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
           '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-          '<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">')
+          '<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet">')
 
 HEADBITS = ('<meta charset="UTF-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">\n'
-            '<meta name="theme-color" content="#F3F0E8">\n'
+            '<meta name="theme-color" content="#16150F">\n'
             '<meta name="apple-mobile-web-app-capable" content="yes">\n'
             '<meta name="apple-mobile-web-app-title" content="Agenda">\n'
             '<title>Agenda · Luciano Polli</title>\n' + FONTES)
