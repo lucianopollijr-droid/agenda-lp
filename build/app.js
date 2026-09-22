@@ -51,7 +51,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, espando:null, open:null, dResto:false, dFora:false, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, tratPrazo:null, anding:null, espando:null, open:null, dResto:false, dFora:false, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -154,7 +154,7 @@ function pzOf(t){ return E.prazos[slug(t)]||null; }
 function setPrazo(t,obj){
   var k=slug(t);
   if(!obj) delete E.prazos[k]; else E.prazos[k]=obj;
-  S.pushPrazo=null; persist(); render();
+  S.pushPrazo=null; S.tratPrazo=null; persist(); render();
 }
 
 function deadlines(incluirResolvidos){
@@ -163,16 +163,19 @@ function deadlines(incluirResolvidos){
     var st=pzOf(d.titulo)||{};
     var resolvido = st.s==='resolvido';
     if(resolvido && !incluirResolvidos) return;
+    var tratando = st.s==='tratando';
+    var aud = !!d.aud || /^Audi[êe]ncia/i.test(d.titulo);
     var vence = st.vence || d.vence;
     var n=Math.round((parse(vence)-BD)/86400000), over=n<0, urg=n<=1;
     out.push({
       titulo:d.titulo, sub:d.detalhe, meta:d.processo, sort:n, resolvido:resolvido, fatal:!!d.fatal,
+      aud:aud, tratando:tratando, tratmot: st.ag||'',
       vence:vence, movido: !!st.vence, motivo: st.m||'', original:d.vence,
       days: over?Math.abs(n):(n===0?'hoje':n),
       unit: over?(Math.abs(n)===1?'dia atrás':'dias atrás'):(n===0?'vence':(n===1?'dia':'dias')),
-      badge: over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':'EM '+n+' DIAS')),
-      color: (urg||over)?'#9A3A31':'#A9853F',
-      tcolor: (urg||over)?'#9A3A31':'#16140E'
+      badge: tratando?'EM TRATAMENTO':(over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':(aud?'AUDIÊNCIA EM '+n+' DIAS':'EM '+n+' DIAS')))),
+      color: tratando?'#2F6259':((urg||over)?'#9A3A31':'#A9853F'),
+      tcolor: tratando?'#16140E':((urg||over)?'#9A3A31':'#16140E')
     });
   });
   out.sort(function(a,b){return a.sort-b.sort;});
@@ -331,10 +334,10 @@ function viewHoje(){
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
     [acompAbertos,'a acompanhar','#F3F0E8'],
-    [dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);}).length,'prazo','#D98C82']];
+    [dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
-    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
+    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
     counts.map(function(c){return '<div><div class="cnum" style="color:'+c[2]+'">'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
     '</div></div><div class="hero-right"><div class="nlabel">'+esc(nlabel)+'</div><div class="ntime">'+esc(next?next.hora:'—')+'</div>'+
     '<div class="ncount">'+esc(ncount)+'</div><div class="ntitle">'+esc(next?next.titulo:'Nada mais marcado')+'</div></div></div>'+
@@ -352,17 +355,19 @@ function viewHoje(){
   });
   h+='</div>';
 
-  var urg=dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);});
+  var pzTrat=dl.filter(function(d){return d.tratando;});
+  var urg=dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));});
   criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
-  if(urg.length||criticas.length||critAnd.length){
-    h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
+  if(urg.length||criticas.length||critAnd.length||pzTrat.length){
+    h+='<div class="block needyou"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
     criticas.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
-    if(critAnd.length){
-      h+='<div class="subhead">Aqui, mas já em andamento</div>'+
-        '<div class="empty" style="padding-bottom:4px">Você já apertou em andamento nestas. Não contam como tarefa aberta e não descem para o fim da página — ficam aqui porque você precisa lembrar delas.</div>';
+    if(critAnd.length||pzTrat.length){
+      h+='<div class="subhead">Em tratamento · de olho</div>'+
+        '<div class="empty" style="padding-bottom:4px">Já estão andando e não gritam mais como atraso — mas seguem aqui porque dependem de você acompanhar ou cobrar.</div>';
       critAnd.forEach(function(t){ h+=taskRowC(t,amanha,'critica'); });
+      pzTrat.forEach(function(d){ h+=prazoRow(d,true); });
     }
     h+='</div>';
   }
@@ -457,10 +462,14 @@ function prazoRow(d,compacto){
     '<div class="tmeta">'+
       '<button class="ghost" data-pzok="'+sl+'">resolvido</button>'+
       '<button class="ghost" data-pzmove="'+sl+'">mudar data</button>'+
+      '<button class="ghost" data-pztrat="'+sl+'">'+(d.tratando?'voltar a cobrar':'em tratamento')+'</button>'+
     '</div>'+
+    (d.tratando&&d.tratmot?'<div class="tmot">Em tratamento · '+esc(d.tratmot)+'</div>':'')+
     (S.pushPrazo===sl?'<div class="inline"><input class="field" id="pzmot" placeholder="O que aconteceu?">'+
       '<input class="field date" type="date" id="pzdate" value="'+esc(d.vence)+'">'+
       '<button class="gold" data-pzsave="'+sl+'">Ok</button></div>':'')+
+    (S.tratPrazo===sl?'<div class="inline"><input class="field" id="pztratmot" placeholder="Em que pé está? De quem você está em cima?">'+
+      '<button class="gold" data-pztratsave="'+sl+'">Ok</button></div>':'')+
     '</div></div>';
   return h;
 }
@@ -503,10 +512,14 @@ function viewPrazos(){
       '<div class="tmeta">'+
         '<button class="ghost" data-pzok="'+sl+'">resolvido</button>'+
         '<button class="ghost" data-pzmove="'+sl+'">mudar data</button>'+
+        '<button class="ghost" data-pztrat="'+sl+'">'+(d.tratando?'voltar a cobrar':'em tratamento')+'</button>'+
       '</div>'+
+      (d.tratando&&d.tratmot?'<div class="tmot">Em tratamento · '+esc(d.tratmot)+'</div>':'')+
       (S.pushPrazo===sl?'<div class="inline"><input class="field" id="pzmot" placeholder="O que aconteceu?">'+
         '<input class="field date" type="date" id="pzdate" value="'+esc(d.vence)+'">'+
         '<button class="gold" data-pzsave="'+sl+'">Ok</button></div>':'')+
+      (S.tratPrazo===sl?'<div class="inline"><input class="field" id="pztratmot" placeholder="Em que pé está? De quem você está em cima?">'+
+        '<button class="gold" data-pztratsave="'+sl+'">Ok</button></div>':'')+
       '</div>'+
       '<div class="pdays"><div class="pnum" style="color:'+d.color+'">'+d.days+'</div><div class="punit">'+d.unit+'</div></div></div>';
   });
@@ -579,7 +592,7 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
+  var el=ev.target.closest('[data-tab],[data-expand],[data-drawer],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pztrat],[data-pztratsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
@@ -647,7 +660,19 @@ document.addEventListener('click', function(ev){
     cur.s='resolvido'; cur.d=iso(new Date());
     setPrazo(p.titulo,cur); return;
   }
-  if(el.dataset.pzmove){ S.pushPrazo=el.dataset.pzmove; S.pushing=null; render(); return; }
+  if(el.dataset.pzmove){ S.pushPrazo=el.dataset.pzmove; S.tratPrazo=null; S.pushing=null; render(); return; }
+  if(el.dataset.pztrat){
+    var pt=prazoFromSlug(el.dataset.pztrat); if(!pt) return;
+    var ct=pzOf(pt.titulo)||{};
+    if(ct.s==='tratando'){ delete ct.s; delete ct.ag; setPrazo(pt.titulo, Object.keys(ct).length?ct:null); return; }
+    S.tratPrazo=el.dataset.pztrat; S.pushPrazo=null; render(); return;
+  }
+  if(el.dataset.pztratsave){
+    var pt2=prazoFromSlug(el.dataset.pztratsave); if(!pt2) return;
+    var ct2=pzOf(pt2.titulo)||{}, ftm=document.getElementById('pztratmot');
+    ct2.s='tratando'; ct2.ag=ftm?ftm.value.trim():''; ct2.d=iso(new Date());
+    setPrazo(pt2.titulo,ct2); return;
+  }
   if(el.dataset.pzsave){
     var p2=prazoFromSlug(el.dataset.pzsave); if(!p2) return;
     var mot=document.getElementById('pzmot'), dd=document.getElementById('pzdate');
@@ -681,6 +706,7 @@ document.addEventListener('keydown', function(ev){
   }
   else if((ev.target.id==='pzmot'||ev.target.id==='pzdate') && ev.key==='Enter'){
     var b2=document.querySelector('[data-pzsave]'); if(b2) b2.click();
+    var b5=document.querySelector('[data-pztratsave]'); if(b5) b5.click();
   }
   else if(ev.target.id==='espfield' && ev.key==='Enter'){
     var b4=document.querySelector('[data-espsave]'); if(b4) b4.click();
