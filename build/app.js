@@ -336,20 +336,23 @@ function viewHoje(){
     [acompAbertos,'a acompanhar','#F3F0E8'],
     [dl.filter(function(d){return !d.tratando && (d.sort<=7 || (d.aud && d.sort<=30));}).length,'prazo','#D98C82']];
 
-  var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
-    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
+  var h='<div class="view"><div class="hero">'+
+    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando;})?'ATENÇÃO':D.tag)+'</div>'+
+    '<div class="counts">'+
     counts.map(function(c){return '<div><div class="cnum" style="color:'+c[2]+'">'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
-    '</div></div><div class="hero-right"><div class="nlabel">'+esc(nlabel)+'</div><div class="ntime">'+esc(next?next.hora:'—')+'</div>'+
-    '<div class="ncount">'+esc(ncount)+'</div><div class="ntitle">'+esc(next?next.titulo:'Nada mais marcado')+'</div></div></div>'+
+    '</div>'+
     '<div class="herofoot"><div class="chip">Carro · '+(carro.bruna?'Bruna hoje':'com você hoje')+'</div>'+
     '<div class="prog">Tarefas '+feitas+'/'+my.length+'</div></div>'+
     '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
 
-  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Agenda de hoje</h2></div>';
-  if(!evs.length) h+='<div class="empty">Nenhum compromisso marcado.</div>';
+  h+='<div class="block"><div class="shead"><h2>Agenda de hoje</h2></div>';
+  if(!evs.length){
+    var prox=D.eventos.filter(function(e){return e.data>BASE;}).sort(function(a,b){return (a.data+a.hora).localeCompare(b.data+b.hora);})[0];
+    h+='<div class="empty">Nada marcado para hoje.'+(prox?' Próximo compromisso: '+esc(prox.titulo)+' · '+esc(fmtDay(prox.data))+(prox.hora?' '+esc(prox.hora):''):'')+'</div>';
+  }
   evs.forEach(function(e){
     var c=cat(e.categoria), past=(BASE===today&&toMin(e.hora)<mn);
-    h+='<div class="row"><div class="rtime" style="color:'+(past?'#B0AC9C':'#16140E')+'">'+esc(e.hora)+'</div><div>'+
+    h+='<div class="row"><div class="rtime"'+(past?' style="color:var(--faint)"':'')+'>'+esc(e.hora||'—')+'</div><div>'+
       '<div class="rtitle">'+esc(e.titulo)+'</div>'+(e.detalhe?'<div class="rsub">'+esc(e.detalhe)+'</div>':'')+
       '<div class="catline"><span class="dot" style="background:'+c[1]+'"></span><span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div></div></div>';
   });
@@ -454,7 +457,7 @@ function viewHoje(){
 function prazoRow(d,compacto){
   var sl=slug(d.titulo);
   var h='<div class="nrow"><div class="nnum">'+d.num+'</div><div style="flex:1"><div class="ntl">'+
-    '<span class="nt" style="color:'+d.tcolor+'">'+esc(d.titulo)+'</span>'+
+    '<span class="nt">'+esc(d.titulo)+'</span>'+
     '<span class="badge" style="border-color:'+d.color+';color:'+d.color+'">'+esc(d.badge)+'</span>'+
     (d.movido?'<span class="badge" style="border-color:#8B8879;color:#8B8879">VOCÊ MOVEU</span>':'')+'</div>'+
     '<div class="ntx">'+esc(d.sub)+'</div>'+
@@ -504,7 +507,7 @@ function viewPrazos(){
   if(!abertos.length) h+='<div class="hint">Nenhum prazo em aberto.</div>';
   abertos.forEach(function(d){
     var sl=slug(d.titulo);
-    h+='<div class="pcard"><div style="flex:1"><div class="pt" style="color:'+d.tcolor+'">'+esc(d.titulo)+'</div>'+
+    h+='<div class="pcard"><div style="flex:1"><div class="pt">'+esc(d.titulo)+'</div>'+
       '<div class="psub">'+esc(d.sub)+'</div>'+
       (d.motivo?'<div class="tmot">'+esc(d.motivo)+'</div>':'')+
       '<div class="pmeta">'+esc(d.meta)+'</div>'+
