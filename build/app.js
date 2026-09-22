@@ -319,6 +319,18 @@ function viewHoje(){
     h+='</div>';
   }
 
+  var esp=espList(), espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito;});
+  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Esperando alguém</h2></div>'+
+    '<div class="empty" style="padding-bottom:4px">Casos em que a sua parte já saiu e agora você está em cima de outra pessoa. Não são tarefas nem prazos — é o histórico para você não esquecer de cobrar.</div>';
+  if(!espAbertos.length) h+='<div class="empty">Nada esperando resposta.</div>';
+  espAbertos.forEach(function(x){ h+=espRow(x); });
+  var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
+  if(espFeitos.length){
+    h+='<div class="empty" style="padding-top:10px;padding-bottom:2px">Voltaram</div>';
+    espFeitos.forEach(function(x){ h+=espRow(x); });
+  }
+  h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo caso esperando alguém e Enter"><button class="dark" id="addesp">Add</button></div></div>';
+
   h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Minhas tarefas</h2></div>';
   my.forEach(function(t){ h+=taskRow(t,amanha); });
   h+='<div class="addrow"><input class="addfield" id="newtask" placeholder="Nova tarefa e Enter"><button class="dark" id="addtask">Add</button></div></div>';
@@ -365,18 +377,6 @@ function viewHoje(){
     h+='<div class="empty" style="padding-top:8px;padding-bottom:0">Guardados até o dia</div>'+linhaDepois(fupsDepois);
   }
   h+='</div>';
-
-  var esp=espList(), espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito;});
-  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Esperando alguém</h2></div>'+
-    '<div class="empty" style="padding-bottom:4px">Casos em que a sua parte já saiu e agora você está em cima de outra pessoa. Não são tarefas nem prazos — é o histórico para você não esquecer de cobrar.</div>';
-  if(!espAbertos.length) h+='<div class="empty">Nada esperando resposta.</div>';
-  espAbertos.forEach(function(x){ h+=espRow(x); });
-  var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
-  if(espFeitos.length){
-    h+='<div class="empty" style="padding-top:10px;padding-bottom:2px">Voltaram</div>';
-    espFeitos.forEach(function(x){ h+=espRow(x); });
-  }
-  h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo caso esperando alguém e Enter"><button class="dark" id="addesp">Add</button></div></div>';
 
   h+='<div class="card"><div class="shead" style="margin-bottom:12px"><span class="tick ink"></span><h2>Fechamento do dia</h2></div><div class="closing">'+
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
