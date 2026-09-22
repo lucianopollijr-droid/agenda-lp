@@ -173,6 +173,7 @@ function taskRow(t, amanha, ctx){
   var selo='';
   if(st==='andamento') selo='<span class="badge" style="border-color:#2F6259;color:#2F6259">EM ANDAMENTO</span>';
   else if(t.prio===1) selo='<span class="badge" style="border-color:#9A3A31;color:#9A3A31">PRIORIDADE</span>';
+  if(ctx==='critica') selo+='<span class="badge" style="border-color:#9A3A31;color:#9A3A31">'+esc(t.selo||'TRAVA UM PRAZO')+'</span>';
   return '<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
     '<div class="ttitle'+(st==='feito'?' done':'')+'">'+esc(t.titulo)+(extra?' <span class="mine">sua</span>':'')+'</div>'+
     (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
@@ -199,6 +200,8 @@ function viewHoje(){
   var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[];
   myAll.forEach(function(t){
     var m=markOf(t.titulo);
+    /* critica fica sempre em "Precisa de voce", mesmo em andamento ou empurrada */
+    if(t.critico){ my.push(t); return; }
     if(m && m.s==='andamento'){ andamento.push(t); return; }
     var volta=(m && m.s==='empurrado' && m.ate)?m.ate:'';
     var quando=t.quando||'';
@@ -215,6 +218,8 @@ function viewHoje(){
   /* tarefa critica sobe para "Precisa de voce" e NAO se repete em "Minhas tarefas" */
   var criticas=my.filter(function(t){ return t.critico; });
   my=my.filter(function(t){ return !t.critico; });
+  var critAnd=criticas.filter(function(t){ return stateOf(t.titulo)==='andamento'; });
+  criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='andamento'; });
   function porPrio(a,b){ return (a.prio||2)-(b.prio||2); }
   my=my.slice().sort(porPrio); fups=fups.slice().sort(porPrio);
   function porEspera(a,b){ return String(a.__espera).localeCompare(String(b.__espera)); }
@@ -226,8 +231,8 @@ function viewHoje(){
   }
 
   var feitas=0, empurradas=[], abertas=0;
-  var contaveis=criticas.concat(my);
-  contaveis.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else abertas++; });
+  var contaveis=criticas.concat(critAnd).concat(my);
+  contaveis.forEach(function(t){ var st=stateOf(t.titulo); if(st==='feito')feitas++; else if(st==='empurrado')empurradas.push(t); else if(st!=='andamento')abertas++; });
   var fupAbertos=fups.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
   var acompAbertos=D.acomp.filter(function(t){return stateOf(t.titulo)!=='feito';}).length;
 
@@ -269,22 +274,16 @@ function viewHoje(){
 
   var urg=dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);});
   criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
-  if(urg.length||criticas.length){
+  critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
+  if(urg.length||criticas.length||critAnd.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
-    criticas.forEach(function(t){
-      var st=stateOf(t.titulo), m=markOf(t.titulo), c=cat(t.categoria), sl=slug(t.titulo);
-      var box = st==='empurrado'?'<span class="box push" data-toggle="'+sl+'">→</span>'
-        : '<span class="box" data-toggle="'+sl+'"></span>';
-      h+='<div class="trow"><div class="tinner">'+box+'<div style="flex:1">'+
-        '<div class="ttitle">'+esc(t.titulo)+'</div>'+
-        (t.detalhe?'<div class="tsub">'+esc(t.detalhe)+'</div>':'')+
-        (st==='empurrado'?'<div class="tmot">Empurrada'+(m&&m.ate?' para '+esc(fmtBr(m.ate)):'')+' · '+esc((m&&m.m)||'sem motivo anotado')+'</div>':'')+
-        '<div class="tmeta"><div class="catline" style="margin-top:0"><span class="dot" style="background:'+c[1]+'"></span>'+
-        '<span class="catlabel" style="color:'+c[1]+'">'+c[0]+'</span></div>'+
-        '<span class="badge" style="border-color:#9A3A31;color:#9A3A31">TRAVA UM PRAZO</span>'+
-        '</div></div></div></div>';
-    });
+    criticas.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
+    if(critAnd.length){
+      h+='<div class="subhead">Aqui, mas já em andamento</div>'+
+        '<div class="empty" style="padding-bottom:4px">Você já apertou em andamento nestas. Não contam como tarefa aberta e não descem para o fim da página — ficam aqui porque você precisa lembrar delas.</div>';
+      critAnd.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
+    }
     h+='</div>';
   }
 
