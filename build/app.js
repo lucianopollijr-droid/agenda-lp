@@ -33,12 +33,14 @@ var D = readJson('dados-do-dia',{});
 D.dia = D.dia || iso(new Date());
 D.tag = D.tag || 'NORMAL';
 D.eventos = D.eventos || []; D.carro = D.carro || {}; D.prazos = D.prazos || [];
-D.minhas = D.minhas || []; D.acomp = D.acomp || [];
+D.minhas = D.minhas || []; D.acomp = D.acomp || []; D.esperando = D.esperando || [];
 
 var E = readJson('estado',{});
 E.marks = E.marks || {};
 E.prazos = E.prazos || {};
 E.extra  = E.extra  || [];
+E.esp    = E.esp    || {};   /* {slug:{m:'nota',feito:bool,d:''}} */
+E.espExtra = E.espExtra || [];
 E.notes  = E.notes  || [];
 E.ts     = E.ts     || 0;
 
@@ -49,7 +51,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, agPrazo:null, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, anding:null, espando:null, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -117,12 +119,42 @@ function setMark(t,st,mot,quando){
 }
 function myList(){ return D.minhas.concat(E.extra); }
 
+/* ---------- esperando alguem ---------- */
+function espList(){
+  return D.esperando.concat(E.espExtra.map(function(x){ x.__meu=true; return x; }));
+}
+function espOf(t){ return E.esp[slug(t)]||{}; }
+function setEsp(t,obj){
+  var k=slug(t);
+  if(!obj) delete E.esp[k]; else E.esp[k]=obj;
+  S.espando=null; persist(); render();
+}
+function espRow(x){
+  var sl=slug(x.titulo), st=espOf(x.titulo), feito=!!st.feito;
+  var prazoIgual=null;
+  D.prazos.forEach(function(p){ if(slug(p.titulo)===sl) prazoIgual=p; });
+  return '<div class="trow"><div class="tinner">'+
+    '<span class="box'+(feito?' feito':' and')+'" data-espok="'+sl+'">'+(feito?'✓':'◐')+'</span><div style="flex:1">'+
+    '<div class="ttitle'+(feito?' done':'')+'">'+esc(x.titulo)+(x.__meu?' <span class="mine">sua</span>':'')+'</div>'+
+    (x.detalhe?'<div class="tsub">'+esc(x.detalhe)+'</div>':'')+
+    (st.m?'<div class="tmot">Sua anotação · '+esc(st.m)+'</div>':'')+
+    (x.quem?'<div class="tmot">Esperando · '+esc(x.quem)+'</div>':'')+
+    (prazoIgual?'<div class="tmot">Também está em Prazos, vencendo '+esc(fmtBr(prazoIgual.vence))+'</div>':'')+
+    '<div class="tmeta">'+
+      '<button class="ghost" data-espnote="'+sl+'">'+(st.m?'mudar anotação':'anotar')+'</button>'+
+      (x.__meu?'<button class="ghost" data-espdel="'+esc(x.titulo)+'">apagar</button>':'')+
+    '</div>'+
+    (S.espando===sl?'<div class="inline"><input class="field" id="espfield" placeholder="Em que pé está? De quem você está esperando?" value="'+esc(st.m||'')+'">'+
+      '<button class="gold" data-espsave="'+sl+'">Ok</button></div>':'')+
+    '</div></div></div>';
+}
+
 /* ---------- prazos ---------- */
 function pzOf(t){ return E.prazos[slug(t)]||null; }
 function setPrazo(t,obj){
   var k=slug(t);
   if(!obj) delete E.prazos[k]; else E.prazos[k]=obj;
-  S.pushPrazo=null; S.agPrazo=null; persist(); render();
+  S.pushPrazo=null; persist(); render();
 }
 
 function deadlines(incluirResolvidos){
@@ -131,18 +163,16 @@ function deadlines(incluirResolvidos){
     var st=pzOf(d.titulo)||{};
     var resolvido = st.s==='resolvido';
     if(resolvido && !incluirResolvidos) return;
-    var aguardando = st.s==='aguardando';
     var vence = st.vence || d.vence;
     var n=Math.round((parse(vence)-BD)/86400000), over=n<0, urg=n<=1;
     out.push({
       titulo:d.titulo, sub:d.detalhe, meta:d.processo, sort:n, resolvido:resolvido, fatal:!!d.fatal,
-      aguardando:aguardando, agmot: st.ag||'',
       vence:vence, movido: !!st.vence, motivo: st.m||'', original:d.vence,
       days: over?Math.abs(n):(n===0?'hoje':n),
       unit: over?(Math.abs(n)===1?'dia atrás':'dias atrás'):(n===0?'vence':(n===1?'dia':'dias')),
-      badge: aguardando?'AGUARDANDO':(over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':'EM '+n+' DIAS'))),
-      color: aguardando?'#2F6259':((urg||over)?'#9A3A31':'#A9853F'),
-      tcolor: aguardando?'#16140E':((urg||over)?'#9A3A31':'#16140E')
+      badge: over?'ATRASADO':(n===0?'VENCE HOJE':(n===1?'PRAZO · AMANHÃ':'EM '+n+' DIAS')),
+      color: (urg||over)?'#9A3A31':'#A9853F',
+      tcolor: (urg||over)?'#9A3A31':'#16140E'
     });
   });
   out.sort(function(a,b){return a.sort-b.sort;});
@@ -253,10 +283,10 @@ function viewHoje(){
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
   var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
     [acompAbertos,'a acompanhar','#F3F0E8'],
-    [dl.filter(function(d){return !d.aguardando && (d.sort<=1||(d.fatal&&d.sort<=30));}).length,'prazo','#D98C82']];
+    [dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero"><div class="hero-cols"><div class="hero-left">'+
-    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.aguardando;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
+    '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0;})?'ATENÇÃO':D.tag)+'</div><div class="counts">'+
     counts.map(function(c){return '<div><div class="cnum" style="color:'+c[2]+'">'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
     '</div></div><div class="hero-right"><div class="nlabel">'+esc(nlabel)+'</div><div class="ntime">'+esc(next?next.hora:'—')+'</div>'+
     '<div class="ncount">'+esc(ncount)+'</div><div class="ntitle">'+esc(next?next.titulo:'Nada mais marcado')+'</div></div></div>'+
@@ -274,19 +304,17 @@ function viewHoje(){
   });
   h+='</div>';
 
-  var pzAg=dl.filter(function(d){return d.aguardando;});
-  var urg=dl.filter(function(d){return !d.aguardando && (d.sort<=1||(d.fatal&&d.sort<=30));});
+  var urg=dl.filter(function(d){return d.sort<=1||(d.fatal&&d.sort<=30);});
   criticas=criticas.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
   critAnd=critAnd.filter(function(t){ return stateOf(t.titulo)!=='feito'; });
-  if(urg.length||criticas.length||critAnd.length||pzAg.length){
+  if(urg.length||criticas.length||critAnd.length){
     h+='<div class="block"><div class="shead"><span class="tick red"></span><h2>Precisa de você</h2></div>';
     criticas.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
     urg.forEach(function(d){ h+=prazoRow(d,true); });
-    if(critAnd.length||pzAg.length){
+    if(critAnd.length){
       h+='<div class="subhead">Aqui, mas já em andamento</div>'+
-        '<div class="empty" style="padding-bottom:4px">Sua parte já saiu; o que falta não depende de você. Não contam como atraso nem como tarefa aberta, e não descem para o fim da página — ficam aqui porque você precisa lembrar delas.</div>';
+        '<div class="empty" style="padding-bottom:4px">Você já apertou em andamento nestas. Não contam como tarefa aberta e não descem para o fim da página — ficam aqui porque você precisa lembrar delas.</div>';
       critAnd.forEach(function(t){ h+=taskRow(t,amanha,'critica'); });
-      pzAg.forEach(function(d){ h+=prazoRow(d,true); });
     }
     h+='</div>';
   }
@@ -338,6 +366,18 @@ function viewHoje(){
   }
   h+='</div>';
 
+  var esp=espList(), espAbertos=esp.filter(function(x){return !espOf(x.titulo).feito;});
+  h+='<div class="block"><div class="shead"><span class="tick"></span><h2>Esperando alguém</h2></div>'+
+    '<div class="empty" style="padding-bottom:4px">Casos em que a sua parte já saiu e agora você está em cima de outra pessoa. Não são tarefas nem prazos — é o histórico para você não esquecer de cobrar.</div>';
+  if(!espAbertos.length) h+='<div class="empty">Nada esperando resposta.</div>';
+  espAbertos.forEach(function(x){ h+=espRow(x); });
+  var espFeitos=esp.filter(function(x){return espOf(x.titulo).feito;});
+  if(espFeitos.length){
+    h+='<div class="empty" style="padding-top:10px;padding-bottom:2px">Voltaram</div>';
+    espFeitos.forEach(function(x){ h+=espRow(x); });
+  }
+  h+='<div class="addrow"><input class="addfield" id="newesp" placeholder="Novo caso esperando alguém e Enter"><button class="dark" id="addesp">Add</button></div></div>';
+
   h+='<div class="card"><div class="shead" style="margin-bottom:12px"><span class="tick ink"></span><h2>Fechamento do dia</h2></div><div class="closing">'+
     '<div><div class="cbig" style="color:#A9853F">'+feitas+'</div><div class="csml">feitas</div></div>'+
     '<div><div class="cbig" style="color:#9A3A31">'+(empurradas.length+adiadas.length+fupsDepois.filter(function(t){return !t.__agendada;}).length)+'</div><div class="csml">empurradas</div></div>'+
@@ -368,17 +408,13 @@ function prazoRow(d,compacto){
     (d.movido?'<span class="badge" style="border-color:#8B8879;color:#8B8879">VOCÊ MOVEU</span>':'')+'</div>'+
     '<div class="ntx">'+esc(d.sub)+'</div>'+
     (d.motivo?'<div class="tmot">'+esc(d.motivo)+'</div>':'')+
-    (d.aguardando?'<div class="tmot">Sua parte já saiu · '+esc(d.agmot||'aguardando terceiro')+'</div>':'')+
     '<div class="tmeta">'+
       '<button class="ghost" data-pzok="'+sl+'">resolvido</button>'+
       '<button class="ghost" data-pzmove="'+sl+'">mudar data</button>'+
-      '<button class="ghost" data-pzag="'+sl+'">'+(d.aguardando?'voltar a cobrar':'aguardando terceiro')+'</button>'+
     '</div>'+
     (S.pushPrazo===sl?'<div class="inline"><input class="field" id="pzmot" placeholder="O que aconteceu?">'+
       '<input class="field date" type="date" id="pzdate" value="'+esc(d.vence)+'">'+
       '<button class="gold" data-pzsave="'+sl+'">Ok</button></div>':'')+
-    (S.agPrazo===sl?'<div class="inline"><input class="field" id="pzagfield" placeholder="Esperando o quê ou quem?">'+
-      '<button class="gold" data-pzagsave="'+sl+'">Ok</button></div>':'')+
     '</div></div>';
   return h;
 }
@@ -416,19 +452,15 @@ function viewPrazos(){
     h+='<div class="pcard"><div style="flex:1"><div class="pt" style="color:'+d.tcolor+'">'+esc(d.titulo)+'</div>'+
       '<div class="psub">'+esc(d.sub)+'</div>'+
       (d.motivo?'<div class="tmot">'+esc(d.motivo)+'</div>':'')+
-      (d.aguardando?'<div class="tmot">Sua parte já saiu · '+esc(d.agmot||'aguardando terceiro')+'</div>':'')+
       '<div class="pmeta">'+esc(d.meta)+'</div>'+
       '<div class="pmeta">Vence '+esc(fmtBr(d.vence))+(d.movido?' · você mudou (a Astrea trazia '+esc(fmtBr(d.original))+')':'')+'</div>'+
       '<div class="tmeta">'+
         '<button class="ghost" data-pzok="'+sl+'">resolvido</button>'+
         '<button class="ghost" data-pzmove="'+sl+'">mudar data</button>'+
-        '<button class="ghost" data-pzag="'+sl+'">'+(d.aguardando?'voltar a cobrar':'aguardando terceiro')+'</button>'+
       '</div>'+
       (S.pushPrazo===sl?'<div class="inline"><input class="field" id="pzmot" placeholder="O que aconteceu?">'+
         '<input class="field date" type="date" id="pzdate" value="'+esc(d.vence)+'">'+
         '<button class="gold" data-pzsave="'+sl+'">Ok</button></div>':'')+
-      (S.agPrazo===sl?'<div class="inline"><input class="field" id="pzagfield" placeholder="Esperando o quê ou quem?">'+
-        '<button class="gold" data-pzagsave="'+sl+'">Ok</button></div>':'')+
       '</div>'+
       '<div class="pdays"><div class="pnum" style="color:'+d.color+'">'+d.days+'</div><div class="punit">'+d.unit+'</div></div></div>';
   });
@@ -501,7 +533,7 @@ function prazoFromSlug(sl){
 }
 
 document.addEventListener('click', function(ev){
-  var el=ev.target.closest('[data-tab],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzag],[data-pzagsave],[data-pzundo],[data-delnote],#addtask,#savenote');
+  var el=ev.target.closest('[data-tab],[data-toggle],[data-push],[data-pushsave],[data-and],[data-andsave],[data-del],[data-pzok],[data-pzmove],[data-pzsave],[data-pzundo],[data-espok],[data-espnote],[data-espsave],[data-espdel],[data-delnote],#addtask,#addesp,#savenote');
   if(!el) return;
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
@@ -537,25 +569,37 @@ document.addEventListener('click', function(ev){
     delete E.marks[slug(alvo)];
     persist(); render(); return;
   }
+  if(el.dataset.espok){
+    var ek=el.dataset.espok, et=null;
+    espList().forEach(function(x){ if(slug(x.titulo)===ek) et=x.titulo; });
+    if(!et) return;
+    var ec=espOf(et); ec.feito=!ec.feito; ec.d=iso(new Date()); setEsp(et,ec); return;
+  }
+  if(el.dataset.espnote){ S.espando=el.dataset.espnote; S.pushing=null; S.anding=null; render(); return; }
+  if(el.dataset.espsave){
+    var sk=el.dataset.espsave, stt=null;
+    espList().forEach(function(x){ if(slug(x.titulo)===sk) stt=x.titulo; });
+    if(!stt) return;
+    var f2=document.getElementById('espfield'), sc=espOf(stt);
+    sc.m=f2?f2.value.trim():''; sc.d=iso(new Date()); setEsp(stt,sc); return;
+  }
+  if(el.dataset.espdel){
+    var al=el.dataset.espdel;
+    E.espExtra=E.espExtra.filter(function(x){return x.titulo!==al;});
+    delete E.esp[slug(al)]; persist(); render(); return;
+  }
+  if(el.id==='addesp'){
+    var ni=document.getElementById('newesp'), v=ni?ni.value.trim():'';
+    if(v){ E.espExtra.push({titulo:v}); persist(); render(); }
+    return;
+  }
   if(el.dataset.pzok){
     var p=prazoFromSlug(el.dataset.pzok); if(!p) return;
     var cur=pzOf(p.titulo)||{};
     cur.s='resolvido'; cur.d=iso(new Date());
     setPrazo(p.titulo,cur); return;
   }
-  if(el.dataset.pzmove){ S.pushPrazo=el.dataset.pzmove; S.agPrazo=null; S.pushing=null; render(); return; }
-  if(el.dataset.pzag){
-    var pa=prazoFromSlug(el.dataset.pzag); if(!pa) return;
-    var ca=pzOf(pa.titulo)||{};
-    if(ca.s==='aguardando'){ delete ca.s; delete ca.ag; setPrazo(pa.titulo, Object.keys(ca).length?ca:null); return; }
-    S.agPrazo=el.dataset.pzag; S.pushPrazo=null; S.pushing=null; render(); return;
-  }
-  if(el.dataset.pzagsave){
-    var pb=prazoFromSlug(el.dataset.pzagsave); if(!pb) return;
-    var cb=pzOf(pb.titulo)||{}, fa=document.getElementById('pzagfield');
-    cb.s='aguardando'; cb.ag=fa?fa.value.trim():''; cb.d=iso(new Date());
-    setPrazo(pb.titulo,cb); return;
-  }
+  if(el.dataset.pzmove){ S.pushPrazo=el.dataset.pzmove; S.pushing=null; render(); return; }
   if(el.dataset.pzsave){
     var p2=prazoFromSlug(el.dataset.pzsave); if(!p2) return;
     var mot=document.getElementById('pzmot'), dd=document.getElementById('pzdate');
@@ -589,7 +633,12 @@ document.addEventListener('keydown', function(ev){
   }
   else if((ev.target.id==='pzmot'||ev.target.id==='pzdate') && ev.key==='Enter'){
     var b2=document.querySelector('[data-pzsave]'); if(b2) b2.click();
-    var b3=document.querySelector('[data-pzagsave]'); if(b3) b3.click();
+  }
+  else if(ev.target.id==='espfield' && ev.key==='Enter'){
+    var b4=document.querySelector('[data-espsave]'); if(b4) b4.click();
+  }
+  else if(ev.target.id==='newesp' && ev.key==='Enter'){
+    var ba2=document.getElementById('addesp'); if(ba2) ba2.click();
   }
   else if(ev.target.id==='notearea' && ev.key==='Enter' && (ev.metaKey||ev.ctrlKey)){ addNote(); }
 });
