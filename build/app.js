@@ -361,14 +361,14 @@ function viewHoje(){
   var carro=D.carro[BASE]||{texto:'',bruna:false};
   var pct=Math.round((feitas/Math.max(criticas.length+my.length,1))*100);
   var amanha=new Date(BD.getFullYear(),BD.getMonth(),BD.getDate()+1);
-  var counts=[[abertas,'tarefas abertas','#F3F0E8'],[fupAbertos,'follow ups','#F3F0E8'],
-    [acompAbertos,'a acompanhar','#F3F0E8'],
+  var counts=[[abertas,'tarefas abertas',''],[fupAbertos,'follow ups',''],
+    [acompAbertos,'a acompanhar',''],
     [dl.filter(function(d){return !d.tratando && !d.conteudo && (d.sort<=7 || (d.aud && d.sort<=30));}).length,'prazo','#D98C82']];
 
   var h='<div class="view"><div class="hero">'+
     '<div class="daytag">'+esc(dl.some(function(d){return d.sort<0 && !d.tratando && !d.conteudo;})?'ATENÇÃO':D.tag)+'</div>'+
     '<div class="counts">'+
-    counts.map(function(c){return '<div><div class="cnum" style="color:'+c[2]+'">'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
+    counts.map(function(c){return '<div><div class="cnum"'+(c[2]?' style="color:'+c[2]+'"':'')+'>'+c[0]+'</div><div class="clabel">'+c[1]+'</div></div>';}).join('')+
     '</div>'+
     '<div class="herofoot"><div class="chip">Carro · '+(carro.bruna?'Bruna hoje':'com você hoje')+'</div>'+
     '<div class="prog">Tarefas '+feitas+'/'+my.length+'</div></div>'+
