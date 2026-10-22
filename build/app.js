@@ -52,7 +52,7 @@ try {
   if(mir && mir.ts > E.ts && mir.dia === D.dia) E = mir;
 } catch(e){}
 
-var S = { tab:'hoje', pushing:null, pushPrazo:null, tratPrazo:null, anding:null, espando:null, esperandoT:null, open:null, dResto:false, dFora:false, status:'boot' };
+var S = { tab:'hoje', pushing:null, pushPrazo:null, tratPrazo:null, anding:null, espando:null, esperandoT:null, open:null, dResto:false, dFora:false, dRot:false, status:'boot' };
 var BASE = D.dia, BD = parse(BASE);
 
 /* ---------- gravacao ---------- */
@@ -308,9 +308,11 @@ function viewHoje(){
   var now=new Date(), today=iso(now), mn=now.getHours()*60+now.getMinutes();
   var evs=evOf(BASE), dl=deadlines(false), myAll=myList();
   myAll.forEach(function(t,i){ t.__extra = i >= D.minhas.length; });
-  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[];
+  var adiadas=[], agendadas=[], fupsDepois=[], andamento=[], fups=[], my=[], rotinas=[];
   myAll.forEach(function(t){
     var m=markOf(t.titulo);
+    /* acompanhamento perpetuo dele: gaveta propria no fim, fora de tudo */
+    if(t.tipo==='rotina'){ rotinas.push(t); return; }
     /* critica fica sempre em "Precisa de voce", mesmo parada ou empurrada */
     if(t.critico){ my.push(t); return; }
     /* parado = em andamento / nao depende de voce agora: bloco unico */
@@ -472,6 +474,18 @@ function viewHoje(){
       if(adiadas.length){ h+='<div class="subhead">Voltam depois</div>'+linhaFora(adiadas,'adiada'); }
       if(agendadas.length){ h+='<div class="subhead">Presas a uma data</div>'+linhaFora(agendadas,'agendada'); }
       if(fupsDepois.length){ h+='<div class="subhead">Follow ups guardados</div>'+linhaFora(fupsDepois,'fup'); }
+    }
+    h+='</div>';
+  }
+
+  /* GAVETA: acompanhamentos perpetuos dele */
+  var rotAbertas=rotinas.filter(function(t){return stateOf(t.titulo)!=='feito';});
+  if(rotAbertas.length){
+    h+='<div class="block"><button class="drawerhead big" data-drawer="rot">'+
+      (S.dRot?'▾  Acompanhamentos meus ('+rotAbertas.length+')':'▸  Acompanhamentos meus ('+rotAbertas.length+')')+'</button>';
+    if(S.dRot){
+      h+='<div class="empty" style="padding-bottom:4px">Frentes que você acompanha sem fim — não são tarefas para concluir nem são da assistente. Ficam aqui, fora da contagem do dia.</div>';
+      rotAbertas.forEach(function(t){ h+=taskRowC(t,amanha); });
     }
     h+='</div>';
   }
@@ -646,7 +660,7 @@ document.addEventListener('click', function(ev){
   var t;
   if(el.dataset.tab){ S.tab=el.dataset.tab; render(); return; }
   if(el.dataset.expand){ S.open = (S.open===el.dataset.expand)?null:el.dataset.expand; S.pushing=null; S.anding=null; render(); return; }
-  if(el.dataset.drawer){ if(el.dataset.drawer==='resto') S.dResto=!S.dResto; else S.dFora=!S.dFora; render(); return; }
+  if(el.dataset.drawer){ if(el.dataset.drawer==='resto') S.dResto=!S.dResto; else if(el.dataset.drawer==='rot') S.dRot=!S.dRot; else S.dFora=!S.dFora; render(); return; }
   if(el.dataset.toggle){
     t=titleFromSlug(el.dataset.toggle); if(!t) return;
     setMark(t, stateOf(t)==='feito'?'aberto':'feito'); return;
